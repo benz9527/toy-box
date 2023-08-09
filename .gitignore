@@ -98,6 +98,8 @@ fabric.properties
 *.dll
 
 # Fortran module files
+!go.mod
+!go.sum
 *.mod
 *.smod
 
