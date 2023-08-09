@@ -1,0 +1,11 @@
+go 1.20
+
+// Use a root dir as a go workspace, aim to uniform manage all sub-projects.
+
+// At first time to init:
+// go work init algo lintcode
+
+use (
+	./algo
+	./lintcode
+)
