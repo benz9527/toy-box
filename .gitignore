@@ -102,7 +102,8 @@ fabric.properties
 # Fortran module files
 !go.mod
 !go.sum
-*.mod
+!./**/go.mod
+!./**/go.sum
 *.smod
 
 # Compiled Static libraries
@@ -147,7 +148,6 @@ fabric.properties
 *.pdb
 
 # Kernel Module Compile Results
-*.mod*
 *.cmd
 .tmp_versions/
 modules.order
@@ -181,7 +181,7 @@ _deps
 # Output of the go coverage tool, specifically when used with LiteIDE
 
 # Dependency directories (remove the comment below to include it)
-vendor/
+./**/vendor/
 
 # Go workspace file
 !go.work
