@@ -1,0 +1,12 @@
+go 1.20
+
+// Use a dir as a go workspace, aim to manage an independent project.
+
+// At first time to init:
+// go work init .
+// Manuallu add '../algo' as go workspace use package.
+
+use (
+	.
+	../algo
+)

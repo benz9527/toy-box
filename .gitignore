@@ -181,6 +181,7 @@ _deps
 # Output of the go coverage tool, specifically when used with LiteIDE
 
 # Dependency directories (remove the comment below to include it)
+vendor/
 ./**/vendor/
 
 # Go workspace file
