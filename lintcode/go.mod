@@ -1,8 +1,9 @@
 module github.com/benz9527/toy-box/lintcode
 
-go 1.20
+go 1.21
 
 require (
+	github.com/benz9527/toy-box/algo v0.0.0-20230813160013-5474e8212472
 	github.com/stretchr/testify v1.8.4
 )
 

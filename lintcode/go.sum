@@ -1,3 +1,5 @@
+github.com/benz9527/toy-box/algo v0.0.0-20230813160013-5474e8212472 h1:4iOL8tM9EZCI/Qj7JOBNUSfsbXeftUfhrUaue4/sA8M=
+github.com/benz9527/toy-box/algo v0.0.0-20230813160013-5474e8212472/go.mod h1:sW18Np2V/W5rs5GO9CHmkqopDjH71jP/qbvPT+6AgMY=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
