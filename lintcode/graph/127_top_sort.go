@@ -126,3 +126,53 @@ func TopoSort2(graph []*DirectedGraphNode) []*DirectedGraphNode {
 	// 有向有环图，其入度数量是不可能减少的
 	return res
 }
+
+func TopoSort3(graph []*DirectedGraphNode) []*DirectedGraphNode {
+	inDegreeMap := map[*DirectedGraphNode]int{}
+	for _, g := range graph {
+		// 初始化入度图
+		if _, ok := inDegreeMap[g]; !ok {
+			inDegreeMap[g] = 0
+		}
+		// 补全入度关系
+		for _, n := range g.Neighbors {
+			if n.Label == g.Label {
+				continue
+			}
+			if _, ok := inDegreeMap[n]; !ok {
+				inDegreeMap[n] = 0
+			}
+			inDegreeMap[n]++
+		}
+	}
+	res := make([]*DirectedGraphNode, 0, len(inDegreeMap))
+	queue := make([]*DirectedGraphNode, 0, len(inDegreeMap))
+	enque := func(node *DirectedGraphNode) {
+		queue = append(queue, node)
+	}
+	deque := func() *DirectedGraphNode {
+		element := queue[0]
+		queue = queue[1:]
+		return element
+	}
+
+	for node, inDegree := range inDegreeMap {
+		if inDegree == 0 {
+			enque(node)
+		}
+	}
+
+	for len(queue) > 0 {
+		node := deque()
+		res = append(res, node)
+		inDegreeMap[node] = -1
+		for _, n := range node.Neighbors {
+			inDegreeMap[n]--
+			if inDegreeMap[n] == 0 {
+				enque(n)
+			}
+		}
+	}
+
+	return res
+}
