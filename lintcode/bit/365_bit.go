@@ -89,3 +89,15 @@ func CountOnes3(n int) int {
 	}
 	return res
 }
+
+func CountOnes4(n int) int {
+	bits := func(num int) int {
+		res := num&0x5 + (num>>1)&0x5
+		return res&0x3 + (res>>2)&0x3
+	}
+	res := 0
+	for i := 0; i < 8; i++ {
+		res += bits((n >> (i * 4)) & 0xf)
+	}
+	return res
+}

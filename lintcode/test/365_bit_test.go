@@ -5,6 +5,32 @@ import (
 	"testing"
 )
 
+func TestCountOnes(t *testing.T) {
+	type args struct {
+		n int
+	}
+	tests := []struct {
+		name string
+		args args
+		want int
+	}{
+		{
+			name: "1",
+			args: args{
+				n: 7,
+			},
+			want: 3,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := bit.CountOnes(tt.args.n); got != tt.want {
+				t.Errorf("CountOnes() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCountOnes2(t *testing.T) {
 	type args struct {
 		n int
@@ -51,7 +77,33 @@ func TestCountOnes3(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := bit.CountOnes3(tt.args.n); got != tt.want {
-				t.Errorf("CountOnes2() = %v, want %v", got, tt.want)
+				t.Errorf("CountOnes3() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCountOnes4(t *testing.T) {
+	type args struct {
+		n int
+	}
+	tests := []struct {
+		name string
+		args args
+		want int
+	}{
+		{
+			name: "1",
+			args: args{
+				n: 7,
+			},
+			want: 3,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := bit.CountOnes4(tt.args.n); got != tt.want {
+				t.Errorf("CountOnes4() = %v, want %v", got, tt.want)
 			}
 		})
 	}
