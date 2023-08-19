@@ -27,3 +27,19 @@ func UniquePaths(m, n int) int {
 
 	return _dpTable[y-1][x-1]
 }
+
+// 该问题也可以转换为对二叉树的遍历，获取树的叶子节点个数，但是这个会导致运行超时
+func UniquePathsAsTree(m, n int) int {
+	var dfs func(int, int) int
+	dfs = func(y int, x int) int {
+		if y >= m || x >= n {
+			return 0
+		}
+		if y == m-1 && x == n-1 {
+			return 1
+		}
+		return dfs(y+1, x) + dfs(y, x+1)
+	}
+
+	return dfs(0, 0)
+}
