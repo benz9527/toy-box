@@ -28,7 +28,8 @@ func UniquePaths(m, n int) int {
 	return _dpTable[y-1][x-1]
 }
 
-// 该问题也可以转换为对二叉树的遍历，获取树的叶子节点个数，但是这个会导致运行超时
+// 该问题也可以转换为对二叉树的遍历，获取树的叶子节点个数，但是这个会导致运行超时 O(2^(m + n - 1) - 1)
+
 func UniquePathsAsTree(m, n int) int {
 	var dfs func(int, int) int
 	dfs = func(y int, x int) int {
@@ -42,4 +43,23 @@ func UniquePathsAsTree(m, n int) int {
 	}
 
 	return dfs(0, 0)
+}
+
+// 使用（数论）组合的角度来说，要到达终点，一定需要遍历完 m+n-2 个点，
+// 而且遍历的过程中一定是有 m-1 行是逐级往下的
+// 最终的问题就是转换为 C(m-1)(m+n-2) 的多项式（组合）问题
+// 多项式容易产生相乘溢出问题
+
+func UniquePathsAsPolynomial(m, n int) int {
+	numerator, denominator := uint64(1), uint64(m-1)
+	count, t := uint64(m-1), uint64(m+n-2)
+	for ; count > 0; count-- {
+		numerator *= t
+		t-- // 不断缩小分子
+		for denominator != 0 && numerator%denominator == 0 {
+			numerator /= denominator
+			denominator--
+		}
+	}
+	return int(numerator)
 }
