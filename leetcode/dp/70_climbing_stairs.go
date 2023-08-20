@@ -34,3 +34,18 @@ func ClimbStairsOptimize(n int) int {
 	}
 	return _dp[2]
 }
+
+func ClimbStairsOptimizeByDp(n int) int {
+	if n == 1 {
+		return 1
+	}
+	_dp := make([]int, n+1)
+	_dp[1] = 1
+	_dp[2] = 2
+	for j := 3; j <= n; j++ {
+		for i := 1; i <= 2; i++ {
+			_dp[j] += _dp[j-i]
+		}
+	}
+	return _dp[n]
+}
