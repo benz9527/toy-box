@@ -75,3 +75,23 @@ func MaxProfitIIOptimize(prices []int) int {
 
 	return _dp[(len(prices)-1)%2][1]
 }
+
+func MaxProfitIIOptimize2(prices []int) int {
+	maximum := func(a, b int) int {
+		if a > b {
+			return a
+		}
+		return b
+	}
+	_dp := make([]int, 2)
+	_dp[0] = -prices[0]
+	_dp[1] = 0
+
+	for i := 1; i < len(prices); i++ {
+		tmp := _dp[0]
+		_dp[0] = maximum(_dp[0], _dp[1]-prices[i])
+		_dp[1] = maximum(_dp[1], prices[i]+tmp)
+	}
+
+	return _dp[1]
+}
