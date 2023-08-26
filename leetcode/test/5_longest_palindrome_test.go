@@ -1,7 +1,7 @@
 package test
 
 import (
-	string2 "github.com/benz9527/toy-box/leetcode/string"
+	string2 "github.com/benz9527/toy-box/leetcode/str"
 	Lo "github.com/samber/lo"
 	"testing"
 )
