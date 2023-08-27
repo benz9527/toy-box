@@ -95,7 +95,7 @@ func MaxProfitIIIOptimize2(prices []int) int {
 }
 
 // https://leetcode.cn/problems/best-time-to-buy-and-sell-stock-iv/description/
-
+// leetcode 188
 // 给你一个整数数组 prices 和一个整数 k ，其中 prices[i] 是某支给定的股票在第 i 天的价格。
 // 设计一个算法来计算你所能获取的最大利润。你最多可以完成 k 笔交易。也就是说，你最多可以买 k 次，卖 k 次。
 // 注意：你不能同时参与多笔交易（你必须在再次购买前出售掉之前的股票）。
@@ -111,16 +111,16 @@ func MaxProfitIV(k int, prices []int) int {
 
 	_dp := make([]int, 2*k)
 
-	for i := 0; i < k; i++ {
-		_dp[2*i] = -prices[0]
+	for i := 0; i < 2*k; i += 2 {
+		_dp[i] = -prices[0]
 	}
 
 	for i := 1; i < len(prices); i++ {
 		_dp[0] = maximum(_dp[0], -prices[i])
 		_dp[1] = maximum(_dp[1], _dp[0]+prices[i])
-		for j := 1; j < k; j++ {
-			_dp[2*j] = maximum(_dp[2*j], _dp[2*j-1]-prices[i])
-			_dp[2*j+1] = maximum(_dp[2*j+1], _dp[2*j]+prices[i])
+		for j := 2; j < 2*k; j += 2 {
+			_dp[j] = maximum(_dp[j], _dp[j-1]-prices[i])
+			_dp[j+1] = maximum(_dp[j+1], _dp[j]+prices[i])
 		}
 	}
 
