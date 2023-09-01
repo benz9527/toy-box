@@ -59,7 +59,8 @@ func InfectionDays(area []int) int {
 
 	for !isEmpty() && rest > 0 {
 		nextDayAreas := make([][2]int, 0)
-		for inflectedArea := lpop(); !isEmpty(); inflectedArea = lpop() {
+		for !isEmpty() {
+			inflectedArea := lpop()
 			for _, nextArea := range nextAreas {
 				x, y := inflectedArea[0]+nextArea[0], inflectedArea[1]+nextArea[1]
 				if x >= 0 && x < n && y >= 0 && y < n && matrix[y][x] == 0 {
@@ -110,7 +111,8 @@ func InfectionDays2(area []int) int {
 	rest := len(area) - len(queue)
 	for !isEmpty() && rest > 0 {
 		nextDayAreas := make([][2]int, 0)
-		for inflectedArea := lpop(); !isEmpty(); inflectedArea = lpop() {
+		for !isEmpty() {
+			inflectedArea := lpop()
 			for _, nextArea := range nextAreas {
 				x, y := inflectedArea[0]+nextArea[0], inflectedArea[1]+nextArea[1]
 				if x >= 0 && x < n && y >= 0 && y < n && area[y*n+x] == 0 {
@@ -124,4 +126,63 @@ func InfectionDays2(area []int) int {
 		rpush(nextDayAreas...)
 	}
 	return ansDays
+}
+
+// 给你一个由 '0' (空地)、'1' (银矿)、'2'(金矿) 组成的的地图，矿堆只能由上下左右相邻的金矿或银矿连接形成。超出地图范围可以认为是空地。
+// 假设银矿价值1，金矿价值2 ，请你找出地图中最大价值的矿堆并输出该矿堆的价值。
+
+func FindMaxValueStockHeapByBFS(matrix [][]int) int {
+	// -1 visited
+	nextAraes := [][2]int{
+		// 0 x 1 y
+		{0, -1}, {0, 1}, {-1, 0}, {1, 0},
+	}
+	ans := 0
+	queue := make([][2]int, 0, 8)
+	lpop := func() [2]int {
+		res := queue[0]
+		queue = queue[1:]
+		return res
+	}
+	rpush := func(loc ...[2]int) {
+		queue = append(queue, loc...)
+	}
+	isEmpty := func() bool {
+		return len(queue) == 0
+	}
+	r, c := len(matrix), len(matrix[0])
+	bfs := func(loc [2]int) int {
+		if matrix[loc[1]][loc[0]] <= 0 {
+			return 0
+		}
+		if isEmpty() {
+			rpush(loc)
+		}
+		tmpSum := 0
+		for !isEmpty() {
+			nextLevelAreas := make([][2]int, 0, 8)
+			for !isEmpty() {
+				heapLoc := lpop()
+				tmpSum += matrix[heapLoc[1]][heapLoc[0]]
+				matrix[heapLoc[1]][heapLoc[0]] = -1
+				for _, nextArea := range nextAraes {
+					x, y := heapLoc[0]+nextArea[0], heapLoc[1]+nextArea[1]
+					if x >= 0 && x < c && y >= 0 && y < r && matrix[y][x] > 0 {
+						nextLevelAreas = append(nextLevelAreas, [2]int{x, y})
+					}
+				}
+			}
+			rpush(nextLevelAreas...)
+		}
+		return tmpSum
+	}
+	for rows := 0; rows < len(matrix); rows++ {
+		for cols := 0; cols < len(matrix[rows]); cols++ {
+			tmpSum := bfs([2]int{cols, rows})
+			if tmpSum > ans {
+				ans = tmpSum
+			}
+		}
+	}
+	return ans
 }
