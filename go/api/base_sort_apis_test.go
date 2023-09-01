@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/stretchr/testify/assert"
 	isort "sort"
 	"testing"
 )
@@ -46,4 +47,121 @@ func TestPersonSort(t *testing.T) {
 	}
 	isort.Sort(personSlice(persons))
 	t.Log(persons)
+}
+
+type participant struct {
+	height, weight int
+}
+
+type participantSlice []participant
+
+func (s participantSlice) Less(i, j int) bool {
+	if s[i].height == s[j].height {
+		return s[i].weight > s[j].weight
+	}
+	return s[i].height > s[j].height
+}
+func (s participantSlice) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+func (s participantSlice) Len() int {
+	return len(s)
+}
+
+func TestParticipants(t *testing.T) {
+	participants := []participant{
+		{
+			height: 181,
+			weight: 70,
+		},
+		{
+			height: 182,
+			weight: 70,
+		},
+		{
+			height: 183,
+			weight: 70,
+		},
+		{
+			height: 184,
+			weight: 70,
+		},
+		{
+			height: 185,
+			weight: 70,
+		},
+		{
+			height: 186,
+			weight: 70,
+		},
+		{
+			height: 180,
+			weight: 71,
+		},
+		{
+			height: 180,
+			weight: 72,
+		},
+		{
+			height: 180,
+			weight: 73,
+		},
+		{
+			height: 180,
+			weight: 74,
+		},
+		{
+			height: 180,
+			weight: 75,
+		},
+	}
+	expected := []participant{
+		{
+			height: 186,
+			weight: 70,
+		},
+		{
+			height: 185,
+			weight: 70,
+		},
+		{
+			height: 184,
+			weight: 70,
+		},
+		{
+			height: 183,
+			weight: 70,
+		},
+		{
+			height: 182,
+			weight: 70,
+		},
+		{
+			height: 181,
+			weight: 70,
+		},
+		{
+			height: 180,
+			weight: 75,
+		},
+		{
+			height: 180,
+			weight: 74,
+		},
+		{
+			height: 180,
+			weight: 73,
+		},
+		{
+			height: 180,
+			weight: 72,
+		},
+		{
+			height: 180,
+			weight: 71,
+		},
+	}
+	isort.Sort(participantSlice(participants))
+	assert.Equal(t, expected, participants)
+	t.Log(participants[:10])
 }

@@ -27,3 +27,15 @@ func TestStringToNumber(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 100, n)
 }
+
+func TestStringSuffix(t *testing.T) {
+	s1 := "dabc"
+	s2 := "bbc"
+	suffix := s2
+	for i := 0; i < len(s2); i++ {
+		if !strings.HasSuffix(s1, suffix) {
+			suffix = suffix[i:]
+		}
+	}
+	t.Log(suffix)
+}
