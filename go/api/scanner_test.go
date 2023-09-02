@@ -2,7 +2,9 @@ package api
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -86,6 +88,66 @@ func TestBufioReader(t *testing.T) {
 		if strings.HasPrefix(line, "hi") {
 			fmt.Println("hello")
 		}
+	}
+}
+
+func TestBufioReaderBlank(t *testing.T) {
+	// reader := bufio.NewReaderSize(os.Stdin, 1) // 无缓冲
+	reader := bufio.NewReader(os.Stdin)
+	ans := make([]string, 0, 16)
+	for {
+		line, err := reader.ReadString(' ')
+		if errors.Is(err, io.EOF) || err != nil {
+			break
+		}
+		if strings.Contains(line, "\r\n") {
+			line = strings.TrimRight(line, "\r\n")
+			if len(line) == 0 {
+				break
+			}
+			ans = append(ans, line)
+			break
+		}
+		if strings.Contains(line, "\n") {
+			line = strings.TrimRight(line, "\n")
+			if len(line) == 0 {
+				break
+			}
+			ans = append(ans, line)
+			break
+		}
+		line = strings.TrimRight(line, " ")
+		ans = append(ans, line)
+	}
+	fmt.Println(ans)
+}
+
+func TestBufioReaderWord(t *testing.T) {
+	var (
+		n      int
+		prefix string
+	)
+	_, err := fmt.Fscanf(os.Stdin, "%s %d", &prefix, &n)
+	if err != nil {
+		os.Exit(0)
+	}
+
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Split(bufio.ScanWords)
+
+	find := false
+	for i := 0; i < n; i++ {
+		scanner.Scan()
+		word := scanner.Text()
+
+		if strings.HasPrefix(word, prefix) {
+			find = true
+			fmt.Println(word)
+		}
+	}
+
+	if !find {
+		fmt.Println(-1)
 	}
 }
 
