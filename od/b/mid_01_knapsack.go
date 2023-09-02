@@ -112,3 +112,91 @@ func JumpGridsII(grids []int) int {
 	}
 	return maximum(_jumpGrids(grids1), _jumpGrids(grids2))
 }
+
+// 平分问题的动态规划解
+// MELON有一堆精美的雨花石（数量为n，重量各异），准备送给S和W。
+// MELON希望送给俩人的雨花石重量一致，请你设计一个程序，帮MELON确认是否能将雨花石平均分配。
+// 第1行输入为雨花石个数：n， 0 < n < 31。
+// 第2行输入为空格分割的各雨花石重量：m[0] m[1] ….. m[n - 1]， 0 < m[k] < 1001。
+// 不需要考虑异常输入的情况。
+
+func Melon(stones []int) int {
+	half := 0
+	for i := 0; i < len(stones); i++ {
+		half += stones[i]
+	}
+	if half&0x1 == 0x1 {
+		return -1
+	}
+	half = half >> 1
+	minimum := func(a, b int) int {
+		if a < b {
+			return a
+		}
+		return b
+	}
+	_dp := make([][]int, len(stones)+1)
+	for i := 0; i <= len(stones); i++ {
+		_dp[i] = make([]int, half+1)
+	}
+	for i := 0; i <= half; i++ {
+		_dp[0][i] = len(stones)
+	}
+	_dp[0][0] = 0
+	for i := 1; i <= len(stones); i++ {
+		stone := stones[i-1]
+		for j := 1; j <= half; j++ {
+			if stone < j {
+				_dp[i][j] = minimum(_dp[i-1][j], _dp[i-1][j-stone]+1)
+			} else if stone == j {
+				_dp[i][j] = 1
+			} else {
+				_dp[i][j] = _dp[i-1][j]
+			}
+		}
+	}
+	ans := _dp[len(stones)][half]
+	if _dp[len(stones)][half] == len(stones) {
+		ans = -1
+	}
+	return ans
+}
+
+func Melon2(stones []int) int {
+	half := 0
+	for i := 0; i < len(stones); i++ {
+		half += stones[i]
+	}
+	if half&0x1 == 0x1 {
+		return -1
+	}
+	half = half >> 1
+	minimum := func(a, b int) int {
+		if a < b {
+			return a
+		}
+		return b
+	}
+	_dp := make([]int, half+1)
+	for i := 0; i <= half; i++ {
+		_dp[i] = len(stones)
+	}
+	_dp[0] = 0
+	for i := 1; i <= len(stones); i++ {
+		stone := stones[i-1]
+		for j := 1; j <= half; j++ {
+			if stone < j {
+				_dp[j] = minimum(_dp[j], _dp[j-stone]+1)
+			} else if stone == j {
+				_dp[j] = 1
+			} else {
+				_dp[j] = _dp[j]
+			}
+		}
+	}
+	ans := _dp[half]
+	if _dp[half] == len(stones) {
+		ans = -1
+	}
+	return ans
+}
