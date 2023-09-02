@@ -1,6 +1,9 @@
 package b
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestKSum(t *testing.T) {
 	type args struct {
@@ -51,6 +54,50 @@ func TestKSum(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := KSum(tt.args.nums, tt.args.k, tt.args.target); got != tt.want {
 				t.Errorf("KSum() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestJumpHousesII(t *testing.T) {
+	type args struct {
+		steps []int
+		count int
+	}
+	tests := []struct {
+		name string
+		args args
+		want []int
+	}{
+		{
+			name: "1",
+			args: args{
+				steps: []int{1, 4, 5, 2, 0, 2},
+				count: 9,
+			},
+			want: []int{4, 5, 0},
+		},
+		{
+			name: "2",
+			args: args{
+				steps: []int{1, 5, 2, 0, 2, 4},
+				count: 9,
+			},
+			want: []int{5, 2, 2},
+		},
+		{
+			name: "2",
+			args: args{
+				steps: []int{-1, 2, 4, 9},
+				count: 12,
+			},
+			want: []int{-1, 4, 9},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := JumpHousesII(tt.args.steps, tt.args.count); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("JumpHousesII() = %v, want %v", got, tt.want)
 			}
 		})
 	}
