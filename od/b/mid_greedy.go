@@ -1,5 +1,9 @@
 package b
 
+import (
+	isort "sort"
+)
+
 // 贪心策略
 
 // 手上有一副扑克牌，每张牌按牌面数字记分（J=11,Q=12,K=13，没有大小王)，出牌时按照以下规则记分：
@@ -94,4 +98,46 @@ func GetMaxScoreOfPokers(pokerStr string) int {
 		ans += _getPokersScore(i, pokers[i])
 	}
 	return ans
+}
+
+// 田忌赛马
+// http://poj.org/problem?id=2287
+// A，B两个人玩一个数字比大小的游戏，在游戏前，两个人会拿到相同长度的两个数字序列，两个数字序列不相同的，且其中的数字是随机的。
+// A，B各自从数字序列中挑选出一个数字进行大小比较，赢的人得1分，输的人扣1分，相等则各自的分数不变。 用过的数字需要丢弃。
+// 求A可能赢B的最大分数。
+
+func GetCompetitionAWinMaxScore(seqA, seqB []int) int {
+	maxScore := 0
+	isort.Ints(seqA)
+	isort.Ints(seqB)
+
+	minAIdx, maxAIdx := 0, len(seqA)-1
+	minBIdx, maxBIdx := 0, len(seqB)-1
+
+	for minAIdx <= maxAIdx {
+		if seqA[maxAIdx] > seqB[maxBIdx] {
+			maxScore += 1
+			maxAIdx--
+			maxBIdx--
+		} else if seqA[maxAIdx] < seqB[maxBIdx] {
+			maxScore -= 1
+			minAIdx++
+			maxBIdx--
+		} else {
+			// eq
+			if seqA[minAIdx] > seqB[minBIdx] {
+				maxScore += 1
+				minAIdx++
+				minBIdx++
+			} else {
+				if seqA[minAIdx] < seqB[maxBIdx] {
+					maxScore -= 1
+				}
+				minAIdx++
+				maxBIdx--
+			}
+		}
+	}
+
+	return maxScore
 }
