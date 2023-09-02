@@ -53,3 +53,62 @@ func MaxCopyFileSize(files []int, n int) int {
 	}
 	return _dp[bagSize]
 }
+
+// 打家劫舍
+
+// 小明和朋友玩跳格子游戏，有 n 个连续格子，每个格子有不同的分数，小朋友可以选择以任意格子起跳，但是不能跳连续的格子，也不能回头跳；
+// 给定一个代表每个格子得分的非负整数数组，计算能够得到的最高分数。
+
+func JumpGrids(grids []int) int {
+	_dp := make([]int, len(grids))
+	maximum := func(a, b int) int {
+		if a > b {
+			return a
+		}
+		return b
+	}
+	_dp[0] = grids[0]
+	if len(grids) > 1 {
+		_dp[1] = maximum(_dp[0], grids[1])
+	}
+	for i := 2; i < len(grids); i++ {
+		for j := len(grids) - 1; j >= i; j-- {
+			_dp[j] = maximum(_dp[j-1], _dp[j-2]+grids[j])
+		}
+	}
+	return _dp[len(grids)-1]
+}
+
+func JumpGridsII(grids []int) int {
+	if len(grids) <= 0 {
+		return 0
+	}
+	if len(grids) == 1 {
+		return grids[0]
+	}
+	grids1 := grids[0 : len(grids)-1]
+	grids2 := grids[1:]
+	maximum := func(a, b int) int {
+		if a > b {
+			return a
+		}
+		return b
+	}
+	_jumpGrids := func(grids []int) int {
+		if len(grids) <= 0 {
+			return 0
+		}
+		_dp := make([]int, len(grids))
+		_dp[0] = grids[0]
+		if len(grids) > 1 {
+			_dp[1] = maximum(_dp[0], grids[1])
+		}
+		for i := 2; i < len(grids); i++ {
+			for j := len(grids) - 1; j >= i; j-- {
+				_dp[j] = maximum(_dp[j-1], _dp[j-2]+grids[j])
+			}
+		}
+		return _dp[len(grids)-1]
+	}
+	return maximum(_jumpGrids(grids1), _jumpGrids(grids2))
+}
