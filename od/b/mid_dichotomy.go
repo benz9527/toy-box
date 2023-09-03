@@ -89,3 +89,66 @@ func BuyMachines(totalSum, totalComponents int, components []component) int {
 	}
 	return ans
 }
+
+// 新来的老师给班里的同学排一个队。
+// 每个学生有一个影力值。
+// 一些学生是刺头，不会听老师的话，自己选位置，非刺头同学在剩下的位置按照能力值从小到大排。
+// 对于非刺头同学，如果发现他前面有能力值比自己高的同学，他不满程度就增加，增加的数量等于前面能力值比他大的同学的个数。
+// 刺头不会产生不满。
+// 如果整个班级累计的不满程度超过k，那么老师就没有办法教这个班级了。
+const (
+	teachable    = 0
+	disteachable = 1
+)
+
+func AngryStudentsAreTeachable(allStudents, badStudentIdxs []int, tolerance int) int {
+	ans := teachable
+	badStuSet := map[int]struct{}{}
+	for _, idx := range badStudentIdxs {
+		badStuSet[idx] = struct{}{}
+	}
+	badStudentAbis := make([]int, 0, 8)
+	angry := 0
+	_getLastIdx := func(abi int) int {
+		l, r := 0, len(badStudentAbis)-1
+		for l <= r {
+			mid := (l + r) >> 1
+			badAbi := badStudentAbis[mid]
+			if abi < badAbi {
+				r = mid - 1
+			} else if abi > badAbi {
+				l = mid + 1
+			} else {
+				if mid == len(badStudentAbis)-1 || badAbi-badStudentAbis[mid+1] != 0 {
+					return mid
+				}
+				l = mid + 1 // unique
+			}
+		}
+		return -l - 1
+	}
+	for i := 0; i < len(allStudents); i++ {
+		abi := allStudents[i]
+		idx := _getLastIdx(abi)
+
+		if idx < 0 {
+			idx = -idx - 1
+		} else {
+			idx += 1
+		}
+
+		if _, ok := badStuSet[i]; ok {
+			if len(badStudentAbis) == 0 || len(badStudentAbis) > 0 && len(badStudentIdxs) < idx {
+				badStudentAbis = append(badStudentAbis, abi)
+			} else if len(badStudentAbis) > 0 && len(badStudentIdxs) >= idx {
+				badStudentAbis = append(badStudentAbis[:idx], append([]int{abi}, badStudentAbis[idx:]...)...)
+			}
+		} else {
+			angry += len(badStudentAbis) - idx
+		}
+	}
+	if angry > tolerance {
+		ans = disteachable
+	}
+	return ans
+}

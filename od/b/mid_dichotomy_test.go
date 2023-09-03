@@ -77,3 +77,42 @@ func TestBuyMachines(t *testing.T) {
 		})
 	}
 }
+
+func TestAngryStudentsAreTeachable(t *testing.T) {
+	type args struct {
+		allStudents    []int
+		badStudentIdxs []int
+		tolerance      int
+	}
+	tests := []struct {
+		name string
+		args args
+		want int
+	}{
+		{
+			name: "1",
+			args: args{
+				allStudents:    []int{1810, 1809, 1801, 1802},
+				badStudentIdxs: []int{0, 1},
+				tolerance:      3,
+			},
+			want: disteachable,
+		},
+		{
+			name: "2",
+			args: args{
+				allStudents:    []int{1801, 1811, 1811, 1802, 1804, 1803},
+				badStudentIdxs: []int{1, 2, 4},
+				tolerance:      3,
+			},
+			want: disteachable,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := AngryStudentsAreTeachable(tt.args.allStudents, tt.args.badStudentIdxs, tt.args.tolerance); got != tt.want {
+				t.Errorf("AngryStudentsAreTeachable() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
