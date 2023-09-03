@@ -152,3 +152,66 @@ func AngryStudentsAreTeachable(allStudents, badStudentIdxs []int, tolerance int)
 	}
 	return ans
 }
+
+// 为了提升软件编码能力，小王制定了刷题计划，他选了题库中的n道题，编号从0到n-1，并计划在m天内按照题目编号顺序刷完所有的题目
+// （注意，小王不能用多天完成同一题）。
+// 在小王刷题计划中，小王需要用tme[i]的时间完成编号 i 的题目。
+// 此外，小王还可以查看答案，可以省去该题的做题时间。为了真正达到刷题效果，小王每天最多直接看一次答案。
+// 我们定义m天中做题时间最多的一天耗时为T（直接看答案的题目不计入做题总时间)。
+// 请你帮小王求出最小的T是多少。
+
+func ProgramPractice(maxDays int, practiceTimes []int) int {
+	maxTime := 0
+	totalTime := 0
+	maximum := func(a, b int) int {
+		if a > b {
+			return a
+		}
+		return b
+	}
+	// 一天干完
+	for i := 0; i < len(practiceTimes); i++ {
+		totalTime += practiceTimes[i]
+		maxTime = maximum(maxTime, practiceTimes[i])
+	}
+
+	_can1DayDone := func(pivotTime int) bool {
+		todayTimeCost := 0
+		maxPracticeCost := 0
+		canWatchAnswer := true
+		usedDays := 1
+		nextPractice := 0
+		for nextPractice < len(practiceTimes) {
+			todayTimeCost += practiceTimes[nextPractice]
+			maxPracticeCost = maximum(maxPracticeCost, practiceTimes[nextPractice])
+			if todayTimeCost > pivotTime {
+				// 做该题超时
+				if canWatchAnswer { // 超时看答案
+					todayTimeCost -= practiceTimes[nextPractice]
+					canWatchAnswer = false
+					nextPractice++
+				} else {
+					// 没答案看了，下一天
+					usedDays++
+					todayTimeCost = 0
+					maxPracticeCost = 0
+					canWatchAnswer = true
+				}
+			} else {
+				nextPractice++
+			}
+		}
+		return usedDays <= maxDays
+	}
+
+	l, r := 0, totalTime-maxTime
+	for l <= r {
+		midTime := (l + r) >> 1
+		if _can1DayDone(midTime) {
+			r = midTime - 1
+		} else {
+			l = midTime + 1
+		}
+	}
+	return l
+}

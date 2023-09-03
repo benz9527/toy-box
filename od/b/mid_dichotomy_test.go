@@ -116,3 +116,43 @@ func TestAngryStudentsAreTeachable(t *testing.T) {
 		})
 	}
 }
+
+func TestProgramPractice(t *testing.T) {
+	type args struct {
+		maxDays       int
+		practiceTimes []int
+	}
+	tests := []struct {
+		name string
+		args args
+		want int
+	}{
+		{
+			name: "1",
+			args: args{
+				maxDays: 5,
+				practiceTimes: []int{
+					1, 2, 2, 3, 5, 4, 6, 7, 8,
+				},
+			},
+			want: 4,
+		},
+		{
+			name: "2",
+			args: args{
+				maxDays: 4,
+				practiceTimes: []int{
+					999, 999, 999,
+				},
+			},
+			want: 0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ProgramPractice(tt.args.maxDays, tt.args.practiceTimes); got != tt.want {
+				t.Errorf("ProgramPractice() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
