@@ -4,9 +4,8 @@ import "testing"
 
 func TestBuyMachines(t *testing.T) {
 	type args struct {
-		totalSum        int
-		totalComponents int
-		components      []component
+		totalSum   int
+		components []component
 	}
 	tests := []struct {
 		name string
@@ -16,8 +15,7 @@ func TestBuyMachines(t *testing.T) {
 		{
 			name: "1",
 			args: args{
-				totalSum:        500,
-				totalComponents: 3,
+				totalSum: 500,
 				components: []component{
 					{
 						kind:        0,
@@ -56,8 +54,7 @@ func TestBuyMachines(t *testing.T) {
 		{
 			name: "2",
 			args: args{
-				totalSum:        100,
-				totalComponents: 1,
+				totalSum: 100,
 				components: []component{
 					{
 						kind:        0,
@@ -71,7 +68,7 @@ func TestBuyMachines(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := BuyMachines(tt.args.totalSum, tt.args.totalComponents, tt.args.components); got != tt.want {
+			if got := BuyMachines(tt.args.totalSum, tt.args.components); got != tt.want {
 				t.Errorf("BuyMachines() = %v, want %v", got, tt.want)
 			}
 		})
@@ -96,7 +93,7 @@ func TestAngryStudentsAreTeachable(t *testing.T) {
 				badStudentIdxs: []int{0, 1},
 				tolerance:      3,
 			},
-			want: disteachable,
+			want: unteachable,
 		},
 		{
 			name: "2",
@@ -105,7 +102,7 @@ func TestAngryStudentsAreTeachable(t *testing.T) {
 				badStudentIdxs: []int{1, 2, 4},
 				tolerance:      3,
 			},
-			want: disteachable,
+			want: unteachable,
 		},
 	}
 	for _, tt := range tests {

@@ -27,7 +27,7 @@ func (s componentSlice) Len() int {
 	return len(s)
 }
 
-func BuyMachines(totalSum, totalComponents int, components []component) int {
+func BuyMachines(totalSum int, components []component) int {
 	reliabilities := make([]int, 0, len(components))
 	groupedComponents := map[int][]component{}
 	for i := 0; i < len(components); i++ {
@@ -43,7 +43,6 @@ func BuyMachines(totalSum, totalComponents int, components []component) int {
 	for _, v := range groupedComponents {
 		isort.Sort(componentSlice(v))
 	}
-
 	// 根据 reliability 约高，price 也越高的同步关系，可以用二分查找
 	binarySearch := func(components []component, maxReliability int) int {
 		// 返回索引
@@ -61,7 +60,7 @@ func BuyMachines(totalSum, totalComponents int, components []component) int {
 		// 插空位置
 		return -lo - 1
 	}
-	isSatisfy := func(gComponents map[int][]component, maxReliability, totalComponents int) bool {
+	isSatisfy := func(gComponents map[int][]component, maxReliability int) bool {
 		sum := 0
 		for _, v := range gComponents {
 			idx := binarySearch(v, maxReliability)
@@ -80,7 +79,7 @@ func BuyMachines(totalSum, totalComponents int, components []component) int {
 	l, h, ans := 0, len(components)-1, -1
 	for l <= h {
 		mid := (l + h) >> 1
-		if isSatisfy(groupedComponents, reliabilities[mid], totalComponents) {
+		if isSatisfy(groupedComponents, reliabilities[mid]) {
 			ans = reliabilities[mid]
 			l = mid + 1
 		} else {
@@ -97,8 +96,8 @@ func BuyMachines(totalSum, totalComponents int, components []component) int {
 // 刺头不会产生不满。
 // 如果整个班级累计的不满程度超过k，那么老师就没有办法教这个班级了。
 const (
-	teachable    = 0
-	disteachable = 1
+	teachable   = 0
+	unteachable = 1
 )
 
 func AngryStudentsAreTeachable(allStudents, badStudentIdxs []int, tolerance int) int {
@@ -148,7 +147,7 @@ func AngryStudentsAreTeachable(allStudents, badStudentIdxs []int, tolerance int)
 		}
 	}
 	if angry > tolerance {
-		ans = disteachable
+		ans = unteachable
 	}
 	return ans
 }
