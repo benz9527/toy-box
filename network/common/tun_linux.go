@@ -49,7 +49,7 @@ func (i *TunIface) CloseIface() error {
 	return TearDownIface(i.Name)
 }
 
-func (i *TunIface) CreateDataChannels() (<-chan []byte, <-chan error) {
+func (i *TunIface) CreateDataChannels() (<-chan []byte, <-chan error, func()) {
 	bufSize := 1522
 	dataCh, errCh := make(chan []byte), make(chan error)
 	go func() {
@@ -63,21 +63,29 @@ func (i *TunIface) CreateDataChannels() (<-chan []byte, <-chan error) {
 			}
 		}
 	}()
-	return dataCh, errCh
+	// 返回只读通道和通道释放方法
+	return dataCh, errCh, func() {
+		// 关闭通道
+		close(dataCh)
+		close(errCh)
+	}
 }
 
 func (i *TunIface) WaitOrReadData(
-	dataCh <-chan []byte,
-	errCh <-chan error,
+	dataROCh <-chan []byte,
+	errROCh <-chan error,
 ) {
 	timeoutTimer := time.NewTimer(6 * time.Second).C
+ReadFrame:
 	for {
 		select {
 		case <-timeoutTimer:
-			log.Fatal("waiting for broadcast packet timeout")
-		case err := <-errCh:
-			log.Fatalf("read packet error: %v", err)
-		case buf := <-dataCh:
+			log.Println("waiting for broadcast packet timeout")
+			break ReadFrame
+		case err := <-errROCh:
+			log.Printf("read packet error: %v\n", err)
+			break ReadFrame
+		case buf := <-dataROCh:
 			// 0x60, 0x0,  0x0,  0x0,  0x0,  0x8, 0x3a, 0xff,
 			// 0xfe, 0x80, 0x0,  0x0,  0x0,  0x0, 0x0,  0x0,
 			// 0x8b, 0x5b, 0x1f, 0x3b, 0xd9, 0xd, 0x3d, 0xa7,

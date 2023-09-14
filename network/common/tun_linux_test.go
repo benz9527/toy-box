@@ -21,7 +21,8 @@ func TestOpenTUNDev(t *testing.T) {
 	err = SetupIface(ifaceMeta, tun.Name)
 	assert.NoError(t, err)
 
-	dataCh, errCh := tun.CreateDataChannels()
+	dataCh, errCh, release := tun.CreateDataChannels()
+	defer release()
 	err = PingIface(ifaceMeta.IP)
 	assert.NoError(t, err)
 	tun.WaitOrReadData(dataCh, errCh)
