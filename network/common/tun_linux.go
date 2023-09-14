@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unsafe"
@@ -52,10 +53,15 @@ func (i *TunIface) CloseIface() error {
 func (i *TunIface) CreateDataChannels() (<-chan []byte, <-chan error, func()) {
 	bufSize := 1522
 	dataCh, errCh := make(chan []byte), make(chan error)
+	isClosed := atomic.Bool{} // 如果不使用这种方式，就得 panic-recover 的重操作
 	go func() {
+	WriteFrame:
 		for {
 			buf := make([]byte, bufSize)
 			n, err := i.Read(buf)
+			if isClosed.Load() {
+				break WriteFrame
+			}
 			if err != nil {
 				errCh <- err
 			} else {
@@ -68,6 +74,7 @@ func (i *TunIface) CreateDataChannels() (<-chan []byte, <-chan error, func()) {
 		// 关闭通道
 		close(dataCh)
 		close(errCh)
+		isClosed.Store(true)
 	}
 }
 
@@ -82,10 +89,16 @@ ReadFrame:
 		case <-timeoutTimer:
 			log.Println("waiting for broadcast packet timeout")
 			break ReadFrame
-		case err := <-errROCh:
+		case err, isOpen := <-errROCh: // for-range 遍历读通道可以高效检查是否关闭
+			if !isOpen {
+				break ReadFrame
+			}
 			log.Printf("read packet error: %v\n", err)
 			break ReadFrame
-		case buf := <-dataROCh:
+		case buf, isOpen := <-dataROCh: // for-range 遍历读通道可以高效检查是否关闭
+			if !isOpen {
+				break ReadFrame
+			}
 			// 0x60, 0x0,  0x0,  0x0,  0x0,  0x8, 0x3a, 0xff,
 			// 0xfe, 0x80, 0x0,  0x0,  0x0,  0x0, 0x0,  0x0,
 			// 0x8b, 0x5b, 0x1f, 0x3b, 0xd9, 0xd, 0x3d, 0xa7,
