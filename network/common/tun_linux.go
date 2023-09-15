@@ -13,7 +13,8 @@ import (
 	"unsafe"
 )
 
-// TUN 虚拟网卡，主要处理 IP 报文，处于网络层 (L3)
+// TUN 虚拟网卡 (点对设备)，主要处理 IP 报文，处于网络层 (L3)
+// TUN 作为 user space 和 kernel space 交换数据的接口
 // TUN - IPv4 Packet:
 //  +---------------------------------------------------------------------------------------------------------------+
 //  |       | Octet |           0           |           1           |           2           |           3           |
@@ -82,7 +83,7 @@ func (i *TunIface) WaitOrReadData(
 	dataROCh <-chan []byte,
 	errROCh <-chan error,
 ) {
-	timeoutTimer := time.NewTimer(6 * time.Second).C
+	timeoutTimer := time.NewTimer(2 * time.Second).C
 ReadFrame:
 	for {
 		select {
