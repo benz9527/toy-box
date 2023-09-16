@@ -1,3 +1,5 @@
+//go:build linux
+
 package api
 
 import (
@@ -104,6 +106,8 @@ func TestEpoll(t *testing.T) {
 	}()
 	wg.Wait()
 	for i := 0; i < fdSize; i++ {
+		err = epoller.remove(fds[i])
+		assert.NoError(t, err)
 		unix.CloseOnExec(fds[i])
 	}
 }
