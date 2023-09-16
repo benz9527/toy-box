@@ -176,13 +176,13 @@ func ProgramPractice(maxDays int, practiceTimes []int) int {
 
 	_can1DayDone := func(pivotTime int) bool {
 		todayTimeCost := 0
-		maxPracticeCost := 0
+		//maxPracticeCost := 0
 		canWatchAnswer := true
 		usedDays := 1
 		nextPractice := 0
 		for nextPractice < len(practiceTimes) {
 			todayTimeCost += practiceTimes[nextPractice]
-			maxPracticeCost = maximum(maxPracticeCost, practiceTimes[nextPractice])
+			//maxPracticeCost = maximum(maxPracticeCost, practiceTimes[nextPractice])
 			if todayTimeCost > pivotTime {
 				// 做该题超时
 				if canWatchAnswer { // 超时看答案
@@ -193,7 +193,7 @@ func ProgramPractice(maxDays int, practiceTimes []int) int {
 					// 没答案看了，下一天
 					usedDays++
 					todayTimeCost = 0
-					maxPracticeCost = 0
+					//maxPracticeCost = 0
 					canWatchAnswer = true
 				}
 			} else {

@@ -50,7 +50,7 @@ func GetReplaceString(str string) string {
 		for j := i + 1; j < len(containers); j++ {
 			nextC := containers[j]
 			if in(sliceToMap(curC), nextC) {
-				containers[i] = append(curC, containers[i+1]...)
+				containers[i] = append(curC, nextC...)
 				containers[j] = []string{}
 			}
 		}

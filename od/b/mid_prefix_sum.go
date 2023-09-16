@@ -9,12 +9,11 @@ package b
 
 func JudgeContinuousSumIsMultipleOfK(nums []int, m int) int {
 	n := len(nums)
-	preSum := make([]int, n)
-	preSum[0] = nums[0]
+	preSum := make([]int, n+1)
 	calcM := map[int]struct{}{}
 	calcM[preSum[0]%m] = struct{}{}
-	for i := 1; i < n; i++ {
-		preSum[i] = preSum[i-1] + nums[i]
+	for i := 1; i <= n; i++ {
+		preSum[i] = preSum[i-1] + nums[i-1]
 		if _, ok := calcM[preSum[i]%m]; ok {
 			return 1
 		} else {
