@@ -1,0 +1,5 @@
+FROM ubuntu:latest
+LABEL authors="Ben.Zheng"
+LABEL email="benzheng.6dev9527@outlook.com"
+
+ENTRYPOINT ["top", "-b"]
