@@ -1,12 +1,29 @@
 package concurrency_test
 
 import (
+	"github.com/onsi/ginkgo/v2/types"
 	"sync"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+func TestFanInSuite(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "FanIn Suite",
+		types.SuiteConfig{
+			LabelFilter:     "FanIn",
+			ParallelTotal:   1,
+			ParallelProcess: 1,
+			GracePeriod:     5 * time.Second,
+		},
+		types.ReporterConfig{
+			Verbose: true,
+		},
+	)
+}
 
 func fanInProducer(C chan<- int, num int) {
 	for i := 0; i < 5; i++ {
@@ -43,16 +60,19 @@ func fanIn(doneC <-chan struct{}, C ...<-chan int) <-chan int {
 	return outC
 }
 
-var _ = Describe("Easy fan in concurrency test", func() {
-	C1, C2, doneC := make(chan int), make(chan int), make(chan struct{})
-	ans := 0
-	It("should fan in jobs from producers", func(ctx SpecContext) {
-		go fanInProducer(C1, 0)
-		go fanInProducer(C2, 10)
-		for v := range fanIn(doneC, C1, C2) {
-			GinkgoWriter.Printf("v: %d\n", v)
-			ans += v
-		}
-		Expect(ans).To(Equal(70))
-	}, SpecTimeout(3*time.Second))
-})
+var _ = Describe("Easy fan in concurrency test", Label("FanIn"),
+	func() {
+		C1, C2, doneC := make(chan int), make(chan int), make(chan struct{})
+		ans := 0
+		It("should fan in jobs from producers", func(ctx SpecContext) {
+			go fanInProducer(C1, 0)
+			go fanInProducer(C2, 10)
+			for v := range fanIn(doneC, C1, C2) {
+				GinkgoWriter.Printf("v: %d\n", v)
+				ans += v
+			}
+			Expect(ans).To(Equal(70))
+		},
+			SpecTimeout(3*time.Second))
+	},
+)
