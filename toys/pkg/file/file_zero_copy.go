@@ -82,7 +82,7 @@ func CopyNFilesUnderDir(outFilename, inDir string) error {
 		}
 		outFile = f
 	} else {
-		f, err := os.OpenFile(outFilename, os.O_WRONLY|os.O_APPEND, 0666)
+		f, err := os.OpenFile(outFilename, os.O_WRONLY|os.O_APPEND, fs.ModePerm)
 		if err != nil {
 			return err
 		}
@@ -96,15 +96,21 @@ func CopyNFilesUnderDir(outFilename, inDir string) error {
 	if fi, err := os.Stat(inDir); os.IsNotExist(err) || fi != nil && !fi.IsDir() {
 		return errors.New("in dir is not a dir or not exist")
 	}
-	if err := filepath.Walk(inDir, func(path string, fi fs.FileInfo, err error) error {
-		if fi != nil && !fi.IsDir() && fi.Mode()&fs.ModeTemporary == 0 {
-			inFiles = append(inFiles, filepath.Join(inDir, fi.Name()))
-		}
-		return nil
-	}); err != nil {
+	// filepath.Walk() 会递归遍历导致问题
+	entries, err := os.ReadDir(inDir)
+	if err != nil {
 		return err
 	}
-
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		inFiles = append(inFiles, filepath.Join(inDir, entry.Name()))
+	}
+	n := len(inFiles)
+	if n <= 0 {
+		return nil
+	}
 	// TODO phase2 监控目录下是否有新文件创建
 
 	cc := newCopyChannel(2000)
@@ -116,7 +122,7 @@ func CopyNFilesUnderDir(outFilename, inDir string) error {
 	if err != nil {
 		return err
 	}
-	n := len(inFiles)
+
 	wg := sync.WaitGroup{}
 	wg.Add(n + 1)
 	_ = p.Submit(func() {
@@ -154,7 +160,7 @@ func CopyNFilesUnderDir(outFilename, inDir string) error {
 		for i := 0; i < len(files); i++ {
 			_f := files[i]
 			_ = p.Submit(func() {
-				f, err := os.OpenFile(_f, os.O_RDONLY, 0666)
+				f, err := os.OpenFile(_f, os.O_RDONLY, fs.ModePerm)
 				if err != nil {
 					// syscall.EBUSY   正在忙碌的文件，不能打开
 					// syscall.ENOENT  目录或者文件不存在，no such file or directory
@@ -197,7 +203,7 @@ func CopyNFilesUnderDirBySplice(outFilename, inDir string) error {
 		}
 		outFile = f
 	} else {
-		f, err := os.OpenFile(outFilename, os.O_WRONLY|os.O_APPEND, 0666)
+		f, err := os.OpenFile(outFilename, os.O_WRONLY|os.O_APPEND, fs.ModePerm)
 		if err != nil {
 			return err
 		}
@@ -211,13 +217,20 @@ func CopyNFilesUnderDirBySplice(outFilename, inDir string) error {
 	if fi, err := os.Stat(inDir); os.IsNotExist(err) || fi != nil && !fi.IsDir() {
 		return errors.New("in dir is not a dir or not exist")
 	}
-	if err := filepath.Walk(inDir, func(path string, fi fs.FileInfo, err error) error {
-		if fi != nil && !fi.IsDir() && fi.Mode()&fs.ModeTemporary == 0 {
-			inFiles = append(inFiles, filepath.Join(inDir, fi.Name()))
-		}
-		return nil
-	}); err != nil {
+	// filepath.Walk() 会递归遍历导致问题
+	entries, err := os.ReadDir(inDir)
+	if err != nil {
 		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		inFiles = append(inFiles, filepath.Join(inDir, entry.Name()))
+	}
+	n := len(inFiles)
+	if n <= 0 {
+		return nil
 	}
 
 	// TODO phase2 监控目录下是否有新文件创建
@@ -231,7 +244,7 @@ func CopyNFilesUnderDirBySplice(outFilename, inDir string) error {
 	if err != nil {
 		return err
 	}
-	n := len(inFiles)
+
 	wg := sync.WaitGroup{}
 	wg.Add(n + 1)
 	_ = p.Submit(func() {
@@ -298,7 +311,7 @@ func CopyNFilesUnderDirBySplice(outFilename, inDir string) error {
 		for i := 0; i < len(files); i++ {
 			_f := files[i]
 			_ = p.Submit(func() {
-				f, err := os.OpenFile(_f, os.O_RDONLY, 0666)
+				f, err := os.OpenFile(_f, os.O_RDONLY, fs.ModePerm)
 				if err != nil {
 					fmt.Println(err)
 					return

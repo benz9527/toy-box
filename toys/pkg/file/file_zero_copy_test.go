@@ -1,7 +1,9 @@
-package file
+package file_test
 
 import (
 	"fmt"
+	. "github.com/benz9527/toy-box/toys/pkg/file"
+	. "github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
@@ -10,59 +12,83 @@ import (
 
 // 测试文件生成参考 dd if=/dev/zero of=test bs=1M count=1000
 
-func TestCopyNFilesUnderDir(t *testing.T) {
-	type args struct {
+type copyNFilesUnderDirTestCase struct {
+	args struct {
 		outFilename string
 		inDir       string
 	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "1",
-			args: args{
-				outFilename: "/tmp/splice.txt",
-				inDir:       "/root/splice",
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := CopyNFilesUnderDir(tt.args.outFilename, tt.args.inDir); (err != nil) != tt.wantErr {
-				t.Errorf("CopyNFilesUnderDir() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
+	wantErr bool
 }
 
-func TestCopyNFilesUnderDirBySplice(t *testing.T) {
-	type args struct {
-		outFilename string
-		inDir       string
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "1",
-			args: args{
-				outFilename: "/tmp/splice-2.txt",
-				inDir:       "/root/splice",
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := CopyNFilesUnderDirBySplice(tt.args.outFilename, tt.args.inDir); (err != nil) != tt.wantErr {
-				t.Errorf("CopyNFilesUnderDir() error = %v, wantErr %v", err, tt.wantErr)
-			}
+var _ = DescribeTable("Copy N files under dir",
+	func(tc *copyNFilesUnderDirTestCase) {
+		err := os.MkdirAll(tc.args.inDir, os.ModePerm)
+		assert.NoError(GinkgoT(), err)
+		dir, _ := filepath.Split(tc.args.outFilename)
+		err = os.MkdirAll(dir, os.ModePerm)
+		assert.NoError(GinkgoT(), err)
+
+		DeferCleanup(func() {
+			assert.NoError(GinkgoT(), os.RemoveAll(tc.args.inDir))
+			assert.NoError(GinkgoT(), os.RemoveAll(dir))
 		})
-	}
+
+		err = CopyNFilesUnderDir(tc.args.outFilename, tc.args.inDir)
+		if tc.wantErr {
+			assert.Error(GinkgoT(), err)
+		} else {
+			assert.NoError(GinkgoT(), err)
+		}
+	},
+	Entry("1", &copyNFilesUnderDirTestCase{
+		args: struct {
+			outFilename string
+			inDir       string
+		}{
+			outFilename: "/tmp/n-files-merge/merged.txt",
+			inDir:       "/tmp/n-files",
+		},
+		wantErr: false,
+	}),
+)
+
+type copyNFilesUnderDirBySpliceTestCase struct {
+	copyNFilesUnderDirTestCase
 }
+
+var _ = DescribeTable("Copy N files under dir by splice",
+	func(tc *copyNFilesUnderDirBySpliceTestCase) {
+		err := os.MkdirAll(tc.args.inDir, os.ModePerm)
+		assert.NoError(GinkgoT(), err)
+		dir, _ := filepath.Split(tc.args.outFilename)
+		err = os.MkdirAll(dir, os.ModePerm)
+		assert.NoError(GinkgoT(), err)
+
+		DeferCleanup(func() {
+			assert.NoError(GinkgoT(), os.RemoveAll(tc.args.inDir))
+			assert.NoError(GinkgoT(), os.RemoveAll(dir))
+		})
+
+		err = CopyNFilesUnderDirBySplice(tc.args.outFilename, tc.args.inDir)
+		if tc.wantErr {
+			assert.Error(GinkgoT(), err)
+		} else {
+			assert.NoError(GinkgoT(), err)
+		}
+	},
+	Entry("1", &copyNFilesUnderDirBySpliceTestCase{
+		copyNFilesUnderDirTestCase{
+			args: struct {
+				outFilename string
+				inDir       string
+			}{
+				outFilename: "/tmp/n-files-splice-merge/splice-merge.txt",
+				inDir:       "/tmp/n-files-splice",
+			},
+			wantErr: false,
+		},
+	}),
+)
 
 // go test -run none -bench BenchmarkCopyNFilesUnderDir -benchtime=1000x -benchmem --parallel 2
 // 在benchmark测试中,通常会多次执行相同的操作来获取平均时间。
