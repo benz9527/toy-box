@@ -2,13 +2,33 @@ package file_test
 
 import (
 	"fmt"
-	. "github.com/benz9527/toy-box/toys/pkg/file"
-	. "github.com/onsi/ginkgo/v2"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	. "github.com/benz9527/toy-box/toys/pkg/file"
+
+	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/types"
+	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 )
+
+func TestZeroCopyFile(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Zero Copy File Suite",
+		types.SuiteConfig{
+			LabelFilter:     "ZeroCopy",
+			ParallelTotal:   1,
+			ParallelProcess: 1,
+			GracePeriod:     5 * time.Second,
+		},
+		types.ReporterConfig{
+			Verbose: true,
+		},
+	)
+}
 
 // 测试文件生成参考 dd if=/dev/zero of=test bs=1M count=1000
 
@@ -21,6 +41,7 @@ type copyNFilesUnderDirTestCase struct {
 }
 
 var _ = DescribeTable("Copy N files under dir",
+	Label("ZeroCopy"),
 	func(tc *copyNFilesUnderDirTestCase) {
 		err := os.MkdirAll(tc.args.inDir, os.ModePerm)
 		assert.NoError(GinkgoT(), err)
@@ -52,11 +73,27 @@ var _ = DescribeTable("Copy N files under dir",
 	}),
 )
 
+func TestZeroCopyFileBySplice(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Zero Copy File By Splice Suite",
+		types.SuiteConfig{
+			LabelFilter:     "ZeroCopySplice",
+			ParallelTotal:   1,
+			ParallelProcess: 1,
+			GracePeriod:     5 * time.Second,
+		},
+		types.ReporterConfig{
+			Verbose: true,
+		},
+	)
+}
+
 type copyNFilesUnderDirBySpliceTestCase struct {
 	copyNFilesUnderDirTestCase
 }
 
 var _ = DescribeTable("Copy N files under dir by splice",
+	Label("ZeroCopySplice"),
 	func(tc *copyNFilesUnderDirBySpliceTestCase) {
 		err := os.MkdirAll(tc.args.inDir, os.ModePerm)
 		assert.NoError(GinkgoT(), err)

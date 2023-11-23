@@ -1,9 +1,11 @@
 package file_test
 
 import (
+	"github.com/onsi/ginkgo/v2/types"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"testing"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -13,133 +15,169 @@ import (
 	. "github.com/benz9527/toy-box/toys/pkg/file"
 )
 
-var _ = Describe("A big size zero file creation test", func() {
-	type zeroFileTestCase struct {
-		pathToFile string
-		size       PieceSize
-	}
+func TestBigZeroFileCreation(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Big Zero File Suite",
+		types.SuiteConfig{
+			LabelFilter:     "BigZeroFile",
+			ParallelTotal:   1,
+			ParallelProcess: 1,
+			GracePeriod:     5 * time.Second,
+		},
+		types.ReporterConfig{
+			Verbose: true,
+		},
+	)
+}
 
-	It("should create a zero file with size 150MB by ZeroFile", func(ctx SpecContext) {
-		By("Initialize the test case 1")
-		tc1 := &zeroFileTestCase{
-			pathToFile: filepath.Join(os.TempDir(), "zero", "tc1", "1.zero"),
-			size:       150 * MB,
+var _ = Describe("A big size zero file creation test",
+	Label("BigZeroFile"),
+	func() {
+		type zeroFileTestCase struct {
+			pathToFile string
+			size       PieceSize
 		}
-		tc1Info, err := os.Stat(tc1.pathToFile)
-		Expect(err).To(MatchError(os.ErrNotExist))
-		Expect(tc1Info).To(BeNil())
 
-		err = os.MkdirAll(filepath.Dir(tc1.pathToFile), fs.ModePerm)
-		GinkgoWriter.Printf("tc1 err: %+v\n", err)
-		Expect(err).To(BeNil())
+		It("should create a zero file with size 150MB by ZeroFile", func(ctx SpecContext) {
+			By("Initialize the test case 1")
+			tc1 := &zeroFileTestCase{
+				pathToFile: filepath.Join(os.TempDir(), "zero", "tc1", "1.zero"),
+				size:       150 * MB,
+			}
+			tc1Info, err := os.Stat(tc1.pathToFile)
+			Expect(err).To(MatchError(os.ErrNotExist))
+			Expect(tc1Info).To(BeNil())
 
-		f, err := os.OpenFile(tc1.pathToFile, os.O_CREATE|os.O_RDWR, fs.ModePerm)
-		Expect(err).To(BeNil())
-		Expect(f).NotTo(BeNil())
-		DeferCleanup(func() {
-			Expect(f).ToNot(BeNil())
-			Expect(f.Close()).To(BeNil())
-			Expect(os.RemoveAll(filepath.Dir(tc1.pathToFile))).To(BeNil())
-		})
+			err = os.MkdirAll(filepath.Dir(tc1.pathToFile), fs.ModePerm)
+			GinkgoWriter.Printf("tc1 err: %+v\n", err)
+			Expect(err).To(BeNil())
 
-		err = FastZeroFile(f, tc1.size)
-		Expect(err).To(BeNil())
+			f, err := os.OpenFile(tc1.pathToFile, os.O_CREATE|os.O_RDWR, fs.ModePerm)
+			Expect(err).To(BeNil())
+			Expect(f).NotTo(BeNil())
+			DeferCleanup(func() {
+				Expect(f).ToNot(BeNil())
+				Expect(f.Close()).To(BeNil())
+				Expect(os.RemoveAll(filepath.Dir(tc1.pathToFile))).To(BeNil())
+			})
 
-		info, err := os.Stat(tc1.pathToFile)
-		Expect(err).To(BeNil())
-		Expect(info.Size()).To(Equal(int64(tc1.size)))
-	}, SpecTimeout(3*time.Second))
-	It("should create a zero file with size 100MB by ZeroFileByTruncate", func(ctx SpecContext) {
-		By("Initialize the test case 2")
-		tc2 := &zeroFileTestCase{
-			pathToFile: filepath.Join(os.TempDir(), "zero", "tc2", "2.zero"),
-			size:       100 * MB,
-		}
-		tc2Info, err := os.Stat(tc2.pathToFile)
-		Expect(err).To(MatchError(os.ErrNotExist))
-		Expect(tc2Info).To(BeNil())
+			err = FastZeroFile(f, tc1.size)
+			Expect(err).To(BeNil())
 
-		err = os.MkdirAll(filepath.Dir(tc2.pathToFile), fs.ModePerm)
-		GinkgoWriter.Printf("tc2 err: %+v\n", err)
+			info, err := os.Stat(tc1.pathToFile)
+			Expect(err).To(BeNil())
+			Expect(info.Size()).To(Equal(int64(tc1.size)))
+		}, SpecTimeout(3*time.Second))
+		It("should create a zero file with size 100MB by ZeroFileByTruncate", func(ctx SpecContext) {
+			By("Initialize the test case 2")
+			tc2 := &zeroFileTestCase{
+				pathToFile: filepath.Join(os.TempDir(), "zero", "tc2", "2.zero"),
+				size:       100 * MB,
+			}
+			tc2Info, err := os.Stat(tc2.pathToFile)
+			Expect(err).To(MatchError(os.ErrNotExist))
+			Expect(tc2Info).To(BeNil())
 
-		f, err := os.OpenFile(tc2.pathToFile, os.O_CREATE|os.O_RDWR, fs.ModePerm)
-		Expect(err).To(BeNil())
-		Expect(f).NotTo(BeNil())
+			err = os.MkdirAll(filepath.Dir(tc2.pathToFile), fs.ModePerm)
+			GinkgoWriter.Printf("tc2 err: %+v\n", err)
 
-		DeferCleanup(func() {
-			Expect(f).ToNot(BeNil())
-			Expect(f.Close()).To(BeNil())
-			Expect(os.RemoveAll(filepath.Dir(tc2.pathToFile))).To(BeNil())
-		})
+			f, err := os.OpenFile(tc2.pathToFile, os.O_CREATE|os.O_RDWR, fs.ModePerm)
+			Expect(err).To(BeNil())
+			Expect(f).NotTo(BeNil())
 
-		err = FastZeroFileByTruncate(f, tc2.size)
-		Expect(err).To(BeNil())
+			DeferCleanup(func() {
+				Expect(f).ToNot(BeNil())
+				Expect(f.Close()).To(BeNil())
+				Expect(os.RemoveAll(filepath.Dir(tc2.pathToFile))).To(BeNil())
+			})
 
-		info, err := os.Stat(tc2.pathToFile)
-		Expect(err).To(BeNil())
-		Expect(info.Size()).To(Equal(int64(tc2.size)))
-	}, SpecTimeout(3*time.Second))
-})
+			err = FastZeroFileByTruncate(f, tc2.size)
+			Expect(err).To(BeNil())
 
-var _ = Describe("A big file cut into pieces", func() {
-	type testcase struct {
-		spec struct {
-			pathToFile   string
-			size         PieceSize
-			shardingSize PieceSize
-		}
-		want struct {
-			piecesCount int
-		}
-	}
-	It("A 150MB file will be cut into 4 pieces, each pieces is le to 40MB", func(ctx SpecContext) {
-		By("Initialize the test case")
-		tc := &testcase{
-			spec: struct {
+			info, err := os.Stat(tc2.pathToFile)
+			Expect(err).To(BeNil())
+			Expect(info.Size()).To(Equal(int64(tc2.size)))
+		}, SpecTimeout(3*time.Second))
+	},
+)
+
+func TestBigFileCutting(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Big File Cutting Suite",
+		types.SuiteConfig{
+			LabelFilter:     "FilePieces",
+			ParallelTotal:   1,
+			ParallelProcess: 1,
+			GracePeriod:     5 * time.Second,
+		},
+		types.ReporterConfig{
+			Verbose: true,
+		},
+	)
+}
+
+var _ = Describe("A big file cut into pieces",
+	Label("FilePieces"),
+	func() {
+		type testcase struct {
+			spec struct {
 				pathToFile   string
 				size         PieceSize
 				shardingSize PieceSize
-			}{
-				pathToFile:   filepath.Join(os.TempDir(), "zero", "tc", "1.zero"),
-				size:         150 * MB,
-				shardingSize: 40 * MB,
-			},
-			want: struct {
+			}
+			want struct {
 				piecesCount int
-			}{
-				piecesCount: 4,
-			},
+			}
 		}
-		tc1Info, err := os.Stat(tc.spec.pathToFile)
-		Expect(err).To(MatchError(os.ErrNotExist))
-		Expect(tc1Info).To(BeNil())
+		It("A 150MB file will be cut into 4 pieces, each pieces is le to 40MB", func(ctx SpecContext) {
+			By("Initialize the test case")
+			tc := &testcase{
+				spec: struct {
+					pathToFile   string
+					size         PieceSize
+					shardingSize PieceSize
+				}{
+					pathToFile:   filepath.Join(os.TempDir(), "zero", "tc", "1.zero"),
+					size:         150 * MB,
+					shardingSize: 40 * MB,
+				},
+				want: struct {
+					piecesCount int
+				}{
+					piecesCount: 4,
+				},
+			}
+			tc1Info, err := os.Stat(tc.spec.pathToFile)
+			Expect(err).To(MatchError(os.ErrNotExist))
+			Expect(tc1Info).To(BeNil())
 
-		By("Mkdir all")
-		err = os.MkdirAll(filepath.Dir(tc.spec.pathToFile), fs.ModePerm)
-		GinkgoWriter.Printf("tc err: %+v\n", err)
-		Expect(err).To(BeNil())
+			By("Mkdir all")
+			err = os.MkdirAll(filepath.Dir(tc.spec.pathToFile), fs.ModePerm)
+			GinkgoWriter.Printf("tc err: %+v\n", err)
+			Expect(err).To(BeNil())
 
-		By("Create big zero file")
-		f, err := os.OpenFile(tc.spec.pathToFile, os.O_CREATE|os.O_RDWR, fs.ModePerm)
-		Expect(err).To(BeNil())
-		Expect(f).NotTo(BeNil())
-		DeferCleanup(func() {
-			By("Defer cleanup big zero file")
-			Expect(f).ToNot(BeNil())
-			Expect(f.Close()).To(BeNil())
-			Expect(os.RemoveAll(filepath.Dir(tc.spec.pathToFile))).To(BeNil())
+			By("Create big zero file")
+			f, err := os.OpenFile(tc.spec.pathToFile, os.O_CREATE|os.O_RDWR, fs.ModePerm)
+			Expect(err).To(BeNil())
+			Expect(f).NotTo(BeNil())
+			DeferCleanup(func() {
+				By("Defer cleanup big zero file")
+				Expect(f).ToNot(BeNil())
+				Expect(f.Close()).To(BeNil())
+				Expect(os.RemoveAll(filepath.Dir(tc.spec.pathToFile))).To(BeNil())
+			})
+			err = FastZeroFile(f, tc.spec.size)
+			Expect(err).To(BeNil())
+			info, err := os.Stat(tc.spec.pathToFile)
+			Expect(err).To(BeNil())
+			Expect(info.Size()).To(Equal(int64(tc.spec.size)))
+
+			By("Cut big zero file into pieces")
+			pieces, err := Cutting(tc.spec.pathToFile, tc.spec.shardingSize)
+			Expect(err).To(BeNil())
+			Expect(pieces).ToNot(BeNil())
+			Expect(len(pieces)).To(Equal(tc.want.piecesCount))
+			GinkgoWriter.Printf("pieces: %s\n", spew.Sdump(pieces))
 		})
-		err = FastZeroFile(f, tc.spec.size)
-		Expect(err).To(BeNil())
-		info, err := os.Stat(tc.spec.pathToFile)
-		Expect(err).To(BeNil())
-		Expect(info.Size()).To(Equal(int64(tc.spec.size)))
-
-		By("Cut big zero file into pieces")
-		pieces, err := Cutting(tc.spec.pathToFile, tc.spec.shardingSize)
-		Expect(err).To(BeNil())
-		Expect(pieces).ToNot(BeNil())
-		Expect(len(pieces)).To(Equal(tc.want.piecesCount))
-		GinkgoWriter.Printf("pieces: %s\n", spew.Sdump(pieces))
-	})
-})
+	},
+)
