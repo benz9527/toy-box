@@ -9,8 +9,9 @@ import (
 )
 
 type threadSafeMap[T any] struct {
-	lock  sync.RWMutex
-	items map[string]T
+	lock         sync.RWMutex
+	items        map[string]T
+	isCloserItem bool
 }
 
 func (t *threadSafeMap[T]) AddOrUpdate(key string, obj T) {
@@ -102,20 +103,21 @@ func (t *threadSafeMap[T]) Close() error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	for _, item := range t.items {
-		if item == nil {
-			continue
-		}
-
-		typ := reflect.TypeOf(item)
-		if typ.Implements(reflect.TypeOf((*io.Closer)(nil)).Elem()) {
-			vals := reflect.ValueOf(item).MethodByName("Close").Call([]reflect.Value{})
-			if len(vals) > 0 && !vals[0].IsNil() {
-				intf := vals[0].Elem().Interface()
-				switch intf.(type) {
-				case error:
-					err := intf.(error)
-					slog.Error("Close info", "error", err)
+	if t.isCloserItem {
+		for _, item := range t.items {
+			if reflect.ValueOf(item).IsNil() {
+				continue
+			}
+			typ := reflect.TypeOf(item)
+			if typ.Implements(reflect.TypeOf((*io.Closer)(nil)).Elem()) {
+				vals := reflect.ValueOf(item).MethodByName("Close").Call([]reflect.Value{})
+				if len(vals) > 0 && !vals[0].IsNil() {
+					intf := vals[0].Elem().Interface()
+					switch intf.(type) {
+					case error:
+						err := intf.(error)
+						slog.Error("Close info", "error", err)
+					}
 				}
 			}
 		}
@@ -126,5 +128,10 @@ func (t *threadSafeMap[T]) Close() error {
 }
 
 func NewThreadSafeMap[T any]() IThreadSafeStore[T] {
-	return &threadSafeMap[T]{items: make(map[string]T)}
+	isCloserItem := false
+	nilT := *new(T)
+	if reflect.TypeOf(nilT).Implements(reflect.TypeOf((*io.Closer)(nil)).Elem()) {
+		isCloserItem = true
+	}
+	return &threadSafeMap[T]{items: make(map[string]T), isCloserItem: isCloserItem}
 }
