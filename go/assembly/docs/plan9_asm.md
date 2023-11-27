@@ -144,9 +144,9 @@ It is legal to have multiple instances of this symbol in a single binary. The li
 (For DATA and GLOBL items.) This data contains no pointers and therefore does not need to be scanned by the garbage collector.
 - WRAPPER = 32
 (For TEXT items.) This is a wrapper function and should not count as disabling recover.
-- NEEDCTXT = 64
-(For TEXT items.) This function is a closure so it uses its incoming context register.
-当使用这些 flag 的字面量时，需要在汇编文件中 #include "textflag.h"。
+  - NEEDCTXT = 64
+  (For TEXT items.) This function is a closure so it uses its incoming context register.
+  当使用这些 flag 的字面量时，需要在汇编文件中添加 #include "textflag.h"，其在 go SDK `src/runtime/textflag.h` 中。
 
 #### .s 和 .go 文件中的变量互用
 refer.go:
