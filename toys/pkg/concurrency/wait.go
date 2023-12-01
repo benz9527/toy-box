@@ -2,55 +2,11 @@ package concurrency
 
 import (
 	"context"
-	"github.com/benz9527/toy-box/toys/pkg/runtime"
 	"log/slog"
 	"math/rand"
-	"sync"
 	"time"
-)
 
-type GGroup struct {
-	wg sync.WaitGroup
-}
-
-func (g *GGroup) Start(fn func()) {
-	g.wg.Add(1)
-	go func() {
-		defer g.wg.Done()
-		fn()
-	}()
-}
-
-func (g *GGroup) Wait() {
-	g.wg.Wait()
-}
-
-func (g *GGroup) StartWithChannel(stopC <-chan struct{}, fn func(stopC <-chan struct{})) {
-	g.Start(func() {
-		fn(stopC)
-	})
-}
-
-func (g *GGroup) StartWithContext(ctx context.Context, fn func(ctx context.Context)) {
-	g.Start(func() {
-		fn(ctx)
-	})
-}
-
-func ContextForChannel(parentC <-chan struct{}) (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		select {
-		case <-parentC:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
-	return ctx, cancel
-}
-
-var (
-	neverStop <-chan struct{} = make(chan struct{})
+	"github.com/benz9527/toy-box/toys/pkg/runtime"
 )
 
 type JitterFactor = float64
@@ -64,7 +20,7 @@ type Jitter struct {
 	Period        time.Duration
 	Factor        JitterFactor
 	Sliding       bool
-	StopC         <-chan struct{}
+	StopC         GenericWaitChannel[struct{}]
 	CrashHandlers []runtime.CrashHandler
 	TraceID       string
 }
@@ -84,7 +40,10 @@ func NewJitter(
 	return j
 }
 
-func WithJitterStopChannel(stopC <-chan struct{}) func(*Jitter) {
+// Cannot use interfaces with methods in union
+// https://github.com/golang/go/issues/45346#issuecomment-862505803
+
+func WithJitterStopChannel[T GenericWaitChannel[struct{}]](stopC T) func(*Jitter) {
 	return func(j *Jitter) {
 		j.StopC = stopC
 	}
@@ -124,7 +83,7 @@ func (j *Jitter) Until(fn func()) {
 
 	for {
 		select {
-		case <-j.StopC:
+		case <-j.StopC.Wait():
 			// Mitigate the case that the stopC and the timer.C were both triggered
 			// (closed) at the same time.
 			// Due to the fairness of the select statement,
@@ -155,7 +114,7 @@ func (j *Jitter) Until(fn func()) {
 		}
 
 		select {
-		case <-j.StopC:
+		case <-j.StopC.Wait():
 			slog.Info("post jitter until stopC triggered", "traceID", j.TraceID)
 			return
 		case <-t.C:
@@ -165,13 +124,13 @@ func (j *Jitter) Until(fn func()) {
 }
 
 func (j *Jitter) UntilWithContext(ctx context.Context, fn func(ctx context.Context)) {
-	j.StopC = ctx.Done()
+	j.StopC = WaitChannelWrapper(ctx.Done())
 	j.Until(func() { fn(ctx) })
 }
 
 func (j *Jitter) Forever(fn func()) {
 	j.Factor = Factor0x
-	j.StopC = neverStop
+	j.StopC = neverStopWaitC
 	j.Sliding = true
 	j.Until(fn)
 }

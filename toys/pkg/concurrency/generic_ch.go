@@ -1,18 +1,56 @@
 package concurrency
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"sync"
+	"sync/atomic"
 )
 
-type GenericChannel[T comparable] struct {
-	ch       chan T
-	isClosed bool
-	once     *sync.Once
-	rwLock   *sync.RWMutex
+type GenericWaitChannel[T comparable] interface {
+	Wait() <-chan T
 }
 
-func NewGenericChannel[T comparable](chSize ...int) *GenericChannel[T] {
+type waitChannel[T comparable] struct {
+	ch <-chan T
+}
+
+func (w *waitChannel[T]) Wait() <-chan T {
+	return w.ch
+}
+
+func WaitChannelWrapper[T comparable](ch <-chan T) GenericWaitChannel[T] {
+	return &waitChannel[T]{ch: ch}
+}
+
+var (
+	neverStopWaitC = WaitChannelWrapper[struct{}](make(chan struct{}))
+)
+
+type GenericChannel[T comparable] interface {
+	io.Closer
+	GenericWaitChannel[T]
+	IsClosed() bool
+	Send(v T, nonBlocking ...bool) error
+}
+
+// safeChannel is a generic channel wrapper.
+// Why we need this wrapper? For the following reasons:
+// 1. We need to make sure the channel is closed only once.
+type safeChannel[T comparable] struct {
+	queueC chan T // Receive data to temporary queue.
+	// cachedOneC chan T // Delivery data from temporary queue.
+	isClosed  atomic.Bool
+	isClosing atomic.Bool
+	once      *sync.Once
+}
+
+var (
+	_ GenericWaitChannel[struct{}] = &safeChannel[struct{}]{} // type check assertion
+)
+
+func NewSafeChannel[T comparable](chSize ...int) GenericChannel[T] {
 	isNoCacheCh := true
 	size := 1
 	if len(chSize) > 0 {
@@ -22,38 +60,71 @@ func NewGenericChannel[T comparable](chSize ...int) *GenericChannel[T] {
 		}
 	}
 	if isNoCacheCh {
-		ch := make(chan T)
-		return &GenericChannel[T]{ch: ch, once: &sync.Once{}, rwLock: &sync.RWMutex{}}
+		return &safeChannel[T]{
+			queueC: make(chan T),
+			once:   &sync.Once{},
+		}
 	}
-	ch := make(chan T, size)
-	return &GenericChannel[T]{ch: ch, once: &sync.Once{}, rwLock: &sync.RWMutex{}}
+	return &safeChannel[T]{
+		queueC: make(chan T, size),
+		once:   &sync.Once{},
+	}
 }
 
-func (c *GenericChannel[T]) IsClosed() bool {
-	return c.isClosed
+func (c *safeChannel[T]) IsClosed() bool {
+	return c.isClosed.Load()
 }
 
-func (c *GenericChannel[T]) Close() {
+// Close According to the Go memory model, a send on a channel happens before
+// the corresponding receive from that channel completes
+// https://go.dev/doc/articles/race_detector
+func (c *safeChannel[T]) Close() error {
 	c.once.Do(func() {
-		c.rwLock.Lock()
-		c.isClosed = true
-		close(c.ch)
-		c.rwLock.Unlock()
+		c.isClosing.Store(true)
+		// FIXME data race, it may do harm to the application
+		close(c.queueC)
+		c.isClosed.Store(true)
+		c.isClosing.Store(false)
 	})
+	return nil
 }
 
-func (c *GenericChannel[T]) Wait() <-chan T {
-	return c.ch
+func (c *safeChannel[T]) Wait() <-chan T {
+	return c.queueC
 }
 
-func (c *GenericChannel[T]) Send(v T) error {
-	c.rwLock.RLock()
-	if c.IsClosed() {
-		c.rwLock.RUnlock()
+func (c *safeChannel[T]) Send(v T, nonBlocking ...bool) error {
+	if c.isClosing.Load() {
+		return fmt.Errorf("channel is closing")
+	}
+	if c.isClosed.Load() {
 		return fmt.Errorf("channel has been closed")
 	}
-	c.rwLock.RUnlock()
 
-	c.ch <- v
+	if len(nonBlocking) <= 0 {
+		nonBlocking = []bool{false}
+	}
+	if !nonBlocking[0] {
+		c.queueC <- v
+	} else {
+		// non blocking send
+		select {
+		case c.queueC <- v:
+		default:
+
+		}
+	}
 	return nil
+}
+
+func ContextForChannel(parentC GenericWaitChannel[struct{}]) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		select {
+		case <-parentC.Wait():
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	return ctx, cancel
 }

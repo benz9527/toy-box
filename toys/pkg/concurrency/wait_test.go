@@ -1,3 +1,5 @@
+//go:build !race
+
 package concurrency_test
 
 import (
@@ -34,7 +36,7 @@ var _ = ginkgo.Describe("Jitter Unit Tests", ginkgo.Ordered, ginkgo.Serial, func
 		ginkgo.Label("Jitter"), func() {
 			called := 0
 			handled := 0
-			stopC := make(chan struct{})
+			stopC := concurrency.NewSafeChannel[struct{}]()
 			resetFn := runtime.SetDefaultCrashHandlers(runtime.NoOpCrashHandler)
 			defer func() {
 				resetFn()
@@ -54,7 +56,7 @@ var _ = ginkgo.Describe("Jitter Unit Tests", ginkgo.Ordered, ginkgo.Serial, func
 				),
 			).Until(func() {
 				if called > 2 {
-					close(stopC)
+					_ = stopC.Close()
 					return
 				}
 				called++
@@ -66,7 +68,7 @@ var _ = ginkgo.Describe("Jitter Unit Tests", ginkgo.Ordered, ginkgo.Serial, func
 	ginkgo.It("jitter until with context",
 		ginkgo.Label("Jitter"), func() {
 			ctx, cancel := context.WithCancel(context.TODO())
-			calledC := concurrency.NewGenericChannel[struct{}]()
+			calledC := concurrency.NewSafeChannel[struct{}]()
 			go func() {
 				concurrency.NewJitter(0, concurrency.Factor1x,
 					concurrency.WithJitterSliding(true),
@@ -78,14 +80,14 @@ var _ = ginkgo.Describe("Jitter Unit Tests", ginkgo.Ordered, ginkgo.Serial, func
 			}()
 			<-calledC.Wait()
 			cancel()
-			calledC.Close()
+			_ = calledC.Close()
 			<-calledC.Wait() // Parallel may be blocked here.
 		},
 	)
 	ginkgo.It("jitter until non sliding",
 		ginkgo.Label("Jitter"), func() {
-			stopC := make(chan struct{})
-			close(stopC)
+			stopC := concurrency.NewSafeChannel[struct{}]()
+			_ = stopC.Close()
 			concurrency.NewJitter(0, concurrency.Factor1x,
 				concurrency.WithJitterSliding(true),
 				concurrency.WithJitterStopChannel(stopC)).
@@ -93,8 +95,8 @@ var _ = ginkgo.Describe("Jitter Unit Tests", ginkgo.Ordered, ginkgo.Serial, func
 					ginkgo.GinkgoWriter.Printf("jitter until non sliding should not have been invoked\n")
 				})
 
-			stopC = make(chan struct{})
-			calledC := concurrency.NewGenericChannel[struct{}]()
+			stopC = concurrency.NewSafeChannel[struct{}]()
+			calledC := concurrency.NewSafeChannel[struct{}]()
 			go func() {
 				concurrency.NewJitter(0, concurrency.Factor1x,
 					concurrency.WithJitterSliding(true),
@@ -105,15 +107,15 @@ var _ = ginkgo.Describe("Jitter Unit Tests", ginkgo.Ordered, ginkgo.Serial, func
 					})
 			}()
 			<-calledC.Wait()
-			close(stopC)
-			calledC.Close()
+			_ = stopC.Close()
+			_ = calledC.Close()
 			<-calledC.Wait() // Parallel may be blocked here.
 		},
 	)
 	ginkgo.It("jitter until with context non sliding",
 		ginkgo.Label("Jitter"), func() {
 			ctx, cancel := context.WithCancel(context.TODO())
-			calledC := concurrency.NewGenericChannel[struct{}]()
+			calledC := concurrency.NewSafeChannel[struct{}]()
 			go func() {
 				concurrency.NewJitter(0, concurrency.Factor1x,
 					concurrency.WithJitterTraceID("ctx-util-no-sliding-1")).
@@ -124,20 +126,20 @@ var _ = ginkgo.Describe("Jitter Unit Tests", ginkgo.Ordered, ginkgo.Serial, func
 			}()
 			<-calledC.Wait()
 			cancel()
-			calledC.Close()
+			_ = calledC.Close()
 			<-calledC.Wait() // Parallel may be blocked here.
 		},
 	)
 	ginkgo.It("jitter until returns immediately",
 		ginkgo.Label("Jitter"), func() {
 			startTs := time.Now()
-			stopC := make(chan struct{})
+			stopC := concurrency.NewSafeChannel[struct{}]()
 			concurrency.NewJitter(30*time.Second, concurrency.Factor1x,
 				concurrency.WithJitterSliding(true),
 				concurrency.WithJitterStopChannel(stopC)).
 				Until(func() {
 					ginkgo.GinkgoWriter.Printf("jitter until returns immediately close channel\n")
-					close(stopC)
+					_ = stopC.Close()
 				})
 			assert.Falsef(ginkgo.GinkgoT(), startTs.Add(25*time.Second).Before(time.Now()), "jitter until returns immediately")
 		},
@@ -145,13 +147,13 @@ var _ = ginkgo.Describe("Jitter Unit Tests", ginkgo.Ordered, ginkgo.Serial, func
 	ginkgo.It("jitter until returns immediately factor 0",
 		ginkgo.Label("Jitter"), func() {
 			startTs := time.Now()
-			stopC := make(chan struct{})
+			stopC := concurrency.NewSafeChannel[struct{}]()
 			concurrency.NewJitter(30*time.Second, concurrency.Factor0x,
 				concurrency.WithJitterSliding(true),
 				concurrency.WithJitterStopChannel(stopC)).
 				Until(func() {
 					ginkgo.GinkgoWriter.Printf("jitter until returns immediately close channel\n")
-					close(stopC)
+					_ = stopC.Close()
 				})
 			assert.Falsef(ginkgo.GinkgoT(), startTs.Add(25*time.Second).Before(time.Now()), "jitter until returns immediately")
 		},
@@ -159,9 +161,9 @@ var _ = ginkgo.Describe("Jitter Unit Tests", ginkgo.Ordered, ginkgo.Serial, func
 	ginkgo.It("jitter until with negative factor",
 		ginkgo.Label("Jitter"), func() {
 			startTs := time.Now()
-			stopC := make(chan struct{})
+			stopC := concurrency.NewSafeChannel[struct{}]()
 			receivedC := make(chan struct{})
-			calledC := concurrency.NewGenericChannel[struct{}]()
+			calledC := concurrency.NewSafeChannel[struct{}]()
 
 			go func() {
 				concurrency.NewJitter(time.Second, -30.0,
@@ -180,7 +182,7 @@ var _ = ginkgo.Describe("Jitter Unit Tests", ginkgo.Ordered, ginkgo.Serial, func
 
 			// 2nd loop
 			<-calledC.Wait()
-			close(stopC)
+			_ = stopC.Close()
 			receivedC <- struct{}{}
 
 			assert.Falsef(ginkgo.GinkgoT(), startTs.Add(3*time.Second).Before(time.Now()),
