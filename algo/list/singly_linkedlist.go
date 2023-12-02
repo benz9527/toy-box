@@ -13,7 +13,6 @@ type NodeElement[T comparable] interface {
 
 type List[T comparable] interface {
 	Len() int64
-	GetRoot() NodeElement[T]
 	Insert(e NodeElement[T]) NodeElement[T]
 	InsertValue(v T) NodeElement[T]
 	InsertAfter(e NodeElement[T], v T) NodeElement[T]
@@ -94,10 +93,6 @@ func (l *SinglyLinkedList[T]) init() *SinglyLinkedList[T] {
 
 func (l *SinglyLinkedList[T]) Len() int64 {
 	return l.len.Load()
-}
-
-func (l *SinglyLinkedList[T]) GetRoot() NodeElement[T] {
-	return &l.root
 }
 
 func (l *SinglyLinkedList[T]) Insert(e NodeElement[T]) NodeElement[T] {
@@ -247,12 +242,6 @@ func (l *ConcurrentSinglyLinkedList[T]) Len() int64 {
 	l.lock.RLock()
 	defer l.lock.RUnlock()
 	return l.list.Len()
-}
-
-func (l *ConcurrentSinglyLinkedList[T]) GetRoot() NodeElement[T] {
-	l.lock.RLock()
-	defer l.lock.RUnlock()
-	return l.list.GetRoot()
 }
 
 func (l *ConcurrentSinglyLinkedList[T]) Insert(e NodeElement[T]) NodeElement[T] {
