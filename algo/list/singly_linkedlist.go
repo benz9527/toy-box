@@ -1,6 +1,9 @@
 package list
 
-import "sync/atomic"
+import (
+	"sync"
+	"sync/atomic"
+)
 
 type NodeElement[T comparable] interface {
 	GetNext() NodeElement[T]
@@ -21,7 +24,9 @@ type List[T comparable] interface {
 }
 
 var (
-	_ NodeElement[struct{}] = (*SinglyNodeElement[struct{}])(nil) // Type check assertion
+	_ NodeElement[struct{}] = (*SinglyNodeElement[struct{}])(nil)          // Type check assertion
+	_ List[struct{}]        = (*SinglyLinkedList[struct{}])(nil)           // Type check assertion
+	_ List[struct{}]        = (*ConcurrentSinglyLinkedList[struct{}])(nil) // Type check assertion
 )
 
 type SinglyNodeElement[T comparable] struct {
@@ -85,12 +90,6 @@ func (l *SinglyLinkedList[T]) init() *SinglyLinkedList[T] {
 	l.tail.list = l
 	l.len.Store(0)
 	return l
-}
-
-func (l *SinglyLinkedList[T]) lazyInit() {
-	if l.root.next == nil {
-		l.init()
-	}
 }
 
 func (l *SinglyLinkedList[T]) Len() int64 {
@@ -229,4 +228,74 @@ func (l *SinglyLinkedList[T]) Find(v T, compareFn ...func(e NodeElement[T]) bool
 		iterator = iterator.GetNext()
 	}
 	return nil, false
+}
+
+type ConcurrentSinglyLinkedList[T comparable] struct {
+	lock sync.RWMutex
+	list List[T]
+}
+
+func NewConcurrentSinglyLinkedList[T comparable]() List[T] {
+	slist := &ConcurrentSinglyLinkedList[T]{
+		lock: sync.RWMutex{},
+		list: NewSinglyLinkedList[T](),
+	}
+	return slist
+}
+
+func (l *ConcurrentSinglyLinkedList[T]) Len() int64 {
+	l.lock.RLock()
+	defer l.lock.RUnlock()
+	return l.list.Len()
+}
+
+func (l *ConcurrentSinglyLinkedList[T]) GetRoot() NodeElement[T] {
+	l.lock.RLock()
+	defer l.lock.RUnlock()
+	return l.list.GetRoot()
+}
+
+func (l *ConcurrentSinglyLinkedList[T]) Insert(e NodeElement[T]) NodeElement[T] {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	e = l.list.Insert(e)
+	return e
+}
+
+func (l *ConcurrentSinglyLinkedList[T]) InsertValue(v T) NodeElement[T] {
+	return l.Insert(NewSinglyNodeElement[T](v))
+}
+
+func (l *ConcurrentSinglyLinkedList[T]) InsertAfter(e NodeElement[T], v T) NodeElement[T] {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	e = l.list.InsertAfter(e, v)
+	return e
+}
+
+func (l *ConcurrentSinglyLinkedList[T]) InsertBefore(e NodeElement[T], v T) NodeElement[T] {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	e = l.list.InsertBefore(e, v)
+	return e
+}
+
+func (l *ConcurrentSinglyLinkedList[T]) Remove(e NodeElement[T]) NodeElement[T] {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	e = l.list.Remove(e)
+	return e
+}
+
+func (l *ConcurrentSinglyLinkedList[T]) ForEach(fn func(e NodeElement[T])) {
+	l.lock.RLock()
+	defer l.lock.RUnlock()
+	l.list.ForEach(fn)
+}
+
+func (l *ConcurrentSinglyLinkedList[T]) Find(v T, compareFn ...func(e NodeElement[T]) bool) (NodeElement[T], bool) {
+	l.lock.RLock()
+	defer l.lock.RUnlock()
+	e, ok := l.list.Find(v, compareFn...)
+	return e, ok
 }
