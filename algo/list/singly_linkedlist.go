@@ -13,8 +13,8 @@ type NodeElement[T comparable] interface {
 
 type List[T comparable] interface {
 	Len() int64
-	Insert(e NodeElement[T]) NodeElement[T]
-	InsertValue(v T) NodeElement[T]
+	Append(e NodeElement[T]) NodeElement[T]
+	AppendValue(v T) NodeElement[T]
 	InsertAfter(e NodeElement[T], v T) NodeElement[T]
 	InsertBefore(e NodeElement[T], v T) NodeElement[T]
 	Remove(e NodeElement[T]) NodeElement[T]
@@ -95,7 +95,7 @@ func (l *SinglyLinkedList[T]) Len() int64 {
 	return l.len.Load()
 }
 
-func (l *SinglyLinkedList[T]) Insert(e NodeElement[T]) NodeElement[T] {
+func (l *SinglyLinkedList[T]) Append(e NodeElement[T]) NodeElement[T] {
 	sne, ok := e.(*SinglyNodeElement[T])
 	if !ok {
 		return l.tail
@@ -113,8 +113,8 @@ func (l *SinglyLinkedList[T]) Insert(e NodeElement[T]) NodeElement[T] {
 	return sne
 }
 
-func (l *SinglyLinkedList[T]) InsertValue(v T) NodeElement[T] {
-	return l.Insert(NewSinglyNodeElement[T](v))
+func (l *SinglyLinkedList[T]) AppendValue(v T) NodeElement[T] {
+	return l.Append(NewSinglyNodeElement[T](v))
 }
 
 func (l *SinglyLinkedList[T]) InsertAfter(e NodeElement[T], v T) NodeElement[T] {
@@ -244,15 +244,15 @@ func (l *ConcurrentSinglyLinkedList[T]) Len() int64 {
 	return l.list.Len()
 }
 
-func (l *ConcurrentSinglyLinkedList[T]) Insert(e NodeElement[T]) NodeElement[T] {
+func (l *ConcurrentSinglyLinkedList[T]) Append(e NodeElement[T]) NodeElement[T] {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	e = l.list.Insert(e)
+	e = l.list.Append(e)
 	return e
 }
 
-func (l *ConcurrentSinglyLinkedList[T]) InsertValue(v T) NodeElement[T] {
-	return l.Insert(NewSinglyNodeElement[T](v))
+func (l *ConcurrentSinglyLinkedList[T]) AppendValue(v T) NodeElement[T] {
+	return l.Append(NewSinglyNodeElement[T](v))
 }
 
 func (l *ConcurrentSinglyLinkedList[T]) InsertAfter(e NodeElement[T], v T) NodeElement[T] {
