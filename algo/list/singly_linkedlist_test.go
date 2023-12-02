@@ -25,7 +25,7 @@ func TestSinglyLinkedListSuite(t *testing.T) {
 			name: "1",
 			suit: func() {
 				gomega.RegisterFailHandler(ginkgo.Fail)
-				ginkgo.RunSpecs(t, "Singly Linked List Suite",
+				ginkgo.RunSpecs(t, "Singly Linked BasicLinkedList Suite",
 					types.SuiteConfig{
 						LabelFilter:     "SinglyLinkedList",
 						ParallelTotal:   1,
@@ -42,7 +42,7 @@ func TestSinglyLinkedListSuite(t *testing.T) {
 			name: "2",
 			suit: func() {
 				gomega.RegisterFailHandler(ginkgo.Fail)
-				ginkgo.RunSpecs(t, "Concurrent Singly Linked List Suite",
+				ginkgo.RunSpecs(t, "Concurrent Singly Linked BasicLinkedList Suite",
 					types.SuiteConfig{
 						LabelFilter:     "ConcurrentSinglyLinkedList Parallel",
 						ParallelTotal:   1,
@@ -63,15 +63,13 @@ func TestSinglyLinkedListSuite(t *testing.T) {
 	}
 }
 
-var _ = ginkgo.Describe("Singly Linked List Unit Tests", ginkgo.Ordered, ginkgo.Serial, func() {
+var _ = ginkgo.Describe("Singly Linked BasicLinkedList Unit Tests", ginkgo.Ordered, ginkgo.Serial, func() {
 	ginkgo.It("singly linked list generation",
 		ginkgo.Label("SinglyLinkedList"),
 		func() {
 			slist := list.NewSinglyLinkedList[int]()
 			assert.NotNil(ginkgo.GinkgoT(), slist)
-			slist.AppendValue(1)
-			slist.AppendValue(2)
-			slist.AppendValue(3)
+			slist.AppendValue(1, 2, 3)
 			assert.Equal(ginkgo.GinkgoT(), int64(3), slist.Len())
 			slist.ForEach(func(e list.NodeElement[int]) {
 				ginkgo.GinkgoWriter.Printf("node element: %v\n", e.GetValue())
@@ -84,8 +82,8 @@ var _ = ginkgo.Describe("Singly Linked List Unit Tests", ginkgo.Ordered, ginkgo.
 			slist := list.NewSinglyLinkedList[int]()
 			assert.NotNil(ginkgo.GinkgoT(), slist)
 			_1n := slist.AppendValue(1)
-			_2n := slist.InsertBefore(_1n, 2)
-			slist.InsertAfter(_2n, 3)
+			_2n := slist.InsertBefore(2, _1n[0])
+			slist.InsertAfter(3, _2n)
 			assert.Equal(ginkgo.GinkgoT(), int64(3), slist.Len())
 			expected := []int{2, 3, 1}
 			actual := make([]int, 0, 3)
@@ -102,10 +100,10 @@ var _ = ginkgo.Describe("Singly Linked List Unit Tests", ginkgo.Ordered, ginkgo.
 			slist := list.NewSinglyLinkedList[int]()
 			assert.NotNil(ginkgo.GinkgoT(), slist)
 			_1n := slist.AppendValue(1)
-			_2n := slist.InsertBefore(_1n, 2)
-			slist.InsertAfter(_2n, 3)
+			_2n := slist.InsertBefore(2, _1n[0])
+			slist.InsertAfter(3, _2n)
 			assert.Equal(ginkgo.GinkgoT(), int64(3), slist.Len())
-			_3n, ok := slist.Find(3)
+			_3n, ok := slist.FindFirst(3)
 			assert.True(ginkgo.GinkgoT(), ok)
 			assert.Equal(ginkgo.GinkgoT(), 3, _3n.GetValue())
 		},
@@ -116,10 +114,13 @@ var _ = ginkgo.Describe("Singly Linked List Unit Tests", ginkgo.Ordered, ginkgo.
 			slist := list.NewSinglyLinkedList[int]()
 			assert.NotNil(ginkgo.GinkgoT(), slist)
 			_1n := slist.AppendValue(1)
-			_2n := slist.InsertBefore(_1n, 2)
-			_3n := slist.InsertAfter(_2n, 3)
-			slist.Append(list.NewSinglyNodeElement(4))
-			slist.Remove(_3n)
+			_2n := slist.InsertBefore(2, _1n[0])
+			_3n := slist.InsertAfter(3, _2n)
+			slist.Append(list.NewNodeElement(4))
+			_3n_1 := slist.Remove(_3n)
+			assert.Equal(ginkgo.GinkgoT(), _3n.GetValue(), _3n_1.GetValue())
+			_3n_1 = slist.Remove(list.NewNodeElement(3))
+			assert.Nil(ginkgo.GinkgoT(), _3n_1)
 			assert.Equal(ginkgo.GinkgoT(), int64(3), slist.Len())
 			expected := []int{2, 1, 4}
 			actual := make([]int, 0, 3)
@@ -136,13 +137,15 @@ var _ = ginkgo.Describe("Singly Linked List Unit Tests", ginkgo.Ordered, ginkgo.
 			slist := list.NewSinglyLinkedList[int]()
 			assert.NotNil(ginkgo.GinkgoT(), slist)
 			_1n := slist.AppendValue(1)
-			_2n := slist.InsertBefore(_1n, 2)
-			_3n := slist.InsertAfter(_2n, 3)
-			slist.Append(list.NewSinglyNodeElement(4))
+			_2n := slist.InsertBefore(2, _1n[0])
+			_3n := slist.InsertAfter(3, _2n)
+			slist.Append(list.NewNodeElement(4))
 			slist.Remove(_3n)
 			slist.Append(nil)
-			slist.InsertBefore(nil, 5)
-			slist.InsertAfter(nil, 6)
+			slist.InsertBefore(5, nil)
+			slist.InsertAfter(6, nil)
+			e := slist.Remove(nil)
+			assert.Nil(ginkgo.GinkgoT(), e)
 			assert.Equal(ginkgo.GinkgoT(), int64(3), slist.Len())
 			expected := []int{2, 1, 4}
 			actual := make([]int, 0, 3)
@@ -155,7 +158,7 @@ var _ = ginkgo.Describe("Singly Linked List Unit Tests", ginkgo.Ordered, ginkgo.
 	)
 })
 
-var _ = ginkgo.Describe("Concurrent Singly Linked List Unit Tests", func() {
+var _ = ginkgo.Describe("Concurrent Singly Linked BasicLinkedList Unit Tests", func() {
 	ginkgo.It("singly linked list generation, remove target node and run in parallel",
 		ginkgo.Label("ConcurrentSinglyLinkedList Parallel"),
 		func() {
@@ -176,14 +179,14 @@ var _ = ginkgo.Describe("Concurrent Singly Linked List Unit Tests", func() {
 				wg.Done()
 			}()
 			go func() {
-				slist.AppendValue(4)
-				wg.Done()
-			}()
-			go func() {
-				_3n, ok := slist.Find(3)
+				_3n, ok := slist.FindFirst(3)
 				if ok && _3n != nil {
 					slist.Remove(_3n)
 				}
+				wg.Done()
+			}()
+			go func() {
+				slist.AppendValue(4)
 				wg.Done()
 			}()
 			wg.Wait()
