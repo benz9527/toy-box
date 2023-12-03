@@ -6,18 +6,18 @@ import (
 )
 
 var (
-	_ BasicLinkedList[struct{}] = (*SinglyLinkedList[struct{}])(nil)           // Type check assertion
-	_ BasicLinkedList[struct{}] = (*ConcurrentSinglyLinkedList[struct{}])(nil) // Type check assertion
+	_ BasicLinkedList[struct{}] = (*singlyLinkedList[struct{}])(nil)           // Type check assertion
+	_ BasicLinkedList[struct{}] = (*concurrentSinglyLinkedList[struct{}])(nil) // Type check assertion
 )
 
-type SinglyLinkedList[T comparable] struct {
+type singlyLinkedList[T comparable] struct {
 	// sentinel list element.
 	root nodeElement[T]
 	len  atomic.Int64
 }
 
 func newSinglyLinkedList[T comparable](concurrent bool) BasicLinkedList[T] {
-	l := new(SinglyLinkedList[T]).init()
+	l := new(singlyLinkedList[T]).init()
 	if concurrent {
 		l.root.lock = &sync.RWMutex{}
 	}
@@ -28,27 +28,27 @@ func NewSinglyLinkedList[T comparable]() BasicLinkedList[T] {
 	return newSinglyLinkedList[T](false)
 }
 
-func (l *SinglyLinkedList[T]) getRoot() NodeElement[T] {
+func (l *singlyLinkedList[T]) getRoot() NodeElement[T] {
 	return &l.root
 }
 
-func (l *SinglyLinkedList[T]) getRootHeader() NodeElement[T] {
+func (l *singlyLinkedList[T]) getRootHeader() NodeElement[T] {
 	return l.root.next
 }
 
-func (l *SinglyLinkedList[T]) setRootHeader(targetE NodeElement[T]) {
+func (l *singlyLinkedList[T]) setRootHeader(targetE NodeElement[T]) {
 	l.root.next = targetE
 }
 
-func (l *SinglyLinkedList[T]) getRootTail() NodeElement[T] {
+func (l *singlyLinkedList[T]) getRootTail() NodeElement[T] {
 	return l.root.prev
 }
 
-func (l *SinglyLinkedList[T]) setRootTail(targetE NodeElement[T]) {
+func (l *singlyLinkedList[T]) setRootTail(targetE NodeElement[T]) {
 	l.root.prev = targetE
 }
 
-func (l *SinglyLinkedList[T]) init() *SinglyLinkedList[T] {
+func (l *singlyLinkedList[T]) init() *singlyLinkedList[T] {
 	l.setRootHeader(&l.root)
 	l.setRootTail(&l.root)
 	l.root.list = l
@@ -56,11 +56,11 @@ func (l *SinglyLinkedList[T]) init() *SinglyLinkedList[T] {
 	return l
 }
 
-func (l *SinglyLinkedList[T]) Len() int64 {
+func (l *singlyLinkedList[T]) Len() int64 {
 	return l.len.Load()
 }
 
-func (l *SinglyLinkedList[T]) isListElement(targetE NodeElement[T]) bool {
+func (l *singlyLinkedList[T]) isListElement(targetE NodeElement[T]) bool {
 	if targetE == nil {
 		return false
 	}
@@ -72,7 +72,7 @@ func (l *SinglyLinkedList[T]) isListElement(targetE NodeElement[T]) bool {
 	return res
 }
 
-func (l *SinglyLinkedList[T]) append(e NodeElement[T]) NodeElement[T] {
+func (l *singlyLinkedList[T]) append(e NodeElement[T]) NodeElement[T] {
 	if !l.isListElement(e) {
 		return nil
 	}
@@ -89,7 +89,7 @@ func (l *SinglyLinkedList[T]) append(e NodeElement[T]) NodeElement[T] {
 	return e
 }
 
-func (l *SinglyLinkedList[T]) Append(elements ...NodeElement[T]) []NodeElement[T] {
+func (l *singlyLinkedList[T]) Append(elements ...NodeElement[T]) []NodeElement[T] {
 	for i := 0; i < len(elements); i++ {
 		if elements[i] == nil {
 			continue
@@ -103,7 +103,7 @@ func (l *SinglyLinkedList[T]) Append(elements ...NodeElement[T]) []NodeElement[T
 	return elements
 }
 
-func (l *SinglyLinkedList[T]) AppendValue(values ...T) []NodeElement[T] {
+func (l *singlyLinkedList[T]) AppendValue(values ...T) []NodeElement[T] {
 	newElements := make([]NodeElement[T], 0, len(values))
 	for _, v := range values {
 		newElements = append(newElements, newNodeElement(v, l))
@@ -111,7 +111,7 @@ func (l *SinglyLinkedList[T]) AppendValue(values ...T) []NodeElement[T] {
 	return l.Append(newElements...)
 }
 
-func (l *SinglyLinkedList[T]) InsertAfter(v T, dstE NodeElement[T]) NodeElement[T] {
+func (l *singlyLinkedList[T]) InsertAfter(v T, dstE NodeElement[T]) NodeElement[T] {
 	if !l.isListElement(dstE) {
 		return nil
 	}
@@ -126,7 +126,7 @@ func (l *SinglyLinkedList[T]) InsertAfter(v T, dstE NodeElement[T]) NodeElement[
 	return newE
 }
 
-func (l *SinglyLinkedList[T]) InsertBefore(v T, dstE NodeElement[T]) NodeElement[T] {
+func (l *singlyLinkedList[T]) InsertBefore(v T, dstE NodeElement[T]) NodeElement[T] {
 	if !l.isListElement(dstE) {
 		return nil
 	}
@@ -151,7 +151,7 @@ func (l *SinglyLinkedList[T]) InsertBefore(v T, dstE NodeElement[T]) NodeElement
 	return newE
 }
 
-func (l *SinglyLinkedList[T]) Remove(targetE NodeElement[T]) NodeElement[T] {
+func (l *singlyLinkedList[T]) Remove(targetE NodeElement[T]) NodeElement[T] {
 	if !l.isListElement(targetE) || targetE.(*nodeElement[T]).list == nil || l.len.Load() == 0 {
 		return nil
 	}
@@ -180,7 +180,7 @@ func (l *SinglyLinkedList[T]) Remove(targetE NodeElement[T]) NodeElement[T] {
 	return targetE
 }
 
-func (l *SinglyLinkedList[T]) ForEach(fn func(e NodeElement[T])) {
+func (l *singlyLinkedList[T]) ForEach(fn func(e NodeElement[T])) {
 	if fn == nil || l.len.Load() == 0 || l.getRootHeader() == l.getRoot() {
 		return
 	}
@@ -191,7 +191,7 @@ func (l *SinglyLinkedList[T]) ForEach(fn func(e NodeElement[T])) {
 	}
 }
 
-func (l *SinglyLinkedList[T]) FindFirst(targetV T, compareFn ...func(e NodeElement[T]) bool) (NodeElement[T], bool) {
+func (l *singlyLinkedList[T]) FindFirst(targetV T, compareFn ...func(e NodeElement[T]) bool) (NodeElement[T], bool) {
 	if l.len.Load() == 0 || l.getRootHeader() == l.getRoot() {
 		return nil, false
 	}
@@ -214,33 +214,33 @@ func (l *SinglyLinkedList[T]) FindFirst(targetV T, compareFn ...func(e NodeEleme
 	return nil, false
 }
 
-type ConcurrentSinglyLinkedList[T comparable] struct {
+type concurrentSinglyLinkedList[T comparable] struct {
 	lock sync.RWMutex
 	list BasicLinkedList[T]
 }
 
 func NewConcurrentSinglyLinkedList[T comparable]() BasicLinkedList[T] {
-	slist := &ConcurrentSinglyLinkedList[T]{
+	slist := &concurrentSinglyLinkedList[T]{
 		lock: sync.RWMutex{},
 		list: newSinglyLinkedList[T](true),
 	}
 	return slist
 }
 
-func (l *ConcurrentSinglyLinkedList[T]) Len() int64 {
+func (l *concurrentSinglyLinkedList[T]) Len() int64 {
 	l.lock.RLock()
 	defer l.lock.RUnlock()
 	return l.list.Len()
 }
 
-func (l *ConcurrentSinglyLinkedList[T]) Append(elements ...NodeElement[T]) []NodeElement[T] {
+func (l *concurrentSinglyLinkedList[T]) Append(elements ...NodeElement[T]) []NodeElement[T] {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	elements = l.list.Append(elements...)
 	return elements
 }
 
-func (l *ConcurrentSinglyLinkedList[T]) AppendValue(values ...T) []NodeElement[T] {
+func (l *concurrentSinglyLinkedList[T]) AppendValue(values ...T) []NodeElement[T] {
 	elements := make([]NodeElement[T], 0, len(values))
 	for _, v := range values {
 		elements = append(elements, newConcurrentNodeElement[T](v, l.list))
@@ -249,34 +249,34 @@ func (l *ConcurrentSinglyLinkedList[T]) AppendValue(values ...T) []NodeElement[T
 	return elements
 }
 
-func (l *ConcurrentSinglyLinkedList[T]) InsertAfter(v T, dstE NodeElement[T]) NodeElement[T] {
+func (l *concurrentSinglyLinkedList[T]) InsertAfter(v T, dstE NodeElement[T]) NodeElement[T] {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	dstE = l.list.InsertAfter(v, dstE)
 	return dstE
 }
 
-func (l *ConcurrentSinglyLinkedList[T]) InsertBefore(v T, dstE NodeElement[T]) NodeElement[T] {
+func (l *concurrentSinglyLinkedList[T]) InsertBefore(v T, dstE NodeElement[T]) NodeElement[T] {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	dstE = l.list.InsertBefore(v, dstE)
 	return dstE
 }
 
-func (l *ConcurrentSinglyLinkedList[T]) Remove(targetE NodeElement[T]) NodeElement[T] {
+func (l *concurrentSinglyLinkedList[T]) Remove(targetE NodeElement[T]) NodeElement[T] {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	targetE = l.list.Remove(targetE)
 	return targetE
 }
 
-func (l *ConcurrentSinglyLinkedList[T]) ForEach(fn func(e NodeElement[T])) {
+func (l *concurrentSinglyLinkedList[T]) ForEach(fn func(e NodeElement[T])) {
 	l.lock.RLock()
 	defer l.lock.RUnlock()
 	l.list.ForEach(fn)
 }
 
-func (l *ConcurrentSinglyLinkedList[T]) FindFirst(v T, compareFn ...func(e NodeElement[T]) bool) (NodeElement[T], bool) {
+func (l *concurrentSinglyLinkedList[T]) FindFirst(v T, compareFn ...func(e NodeElement[T]) bool) (NodeElement[T], bool) {
 	l.lock.RLock()
 	defer l.lock.RUnlock()
 	e, ok := l.list.FindFirst(v, compareFn...)

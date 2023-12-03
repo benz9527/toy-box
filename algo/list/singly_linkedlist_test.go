@@ -27,7 +27,7 @@ func TestSinglyLinkedListSuite(t *testing.T) {
 				gomega.RegisterFailHandler(ginkgo.Fail)
 				ginkgo.RunSpecs(t, "Singly Linked BasicLinkedList Suite",
 					types.SuiteConfig{
-						LabelFilter:     "SinglyLinkedList",
+						LabelFilter:     "singlyLinkedList",
 						ParallelTotal:   1,
 						ParallelProcess: 1,
 						GracePeriod:     5 * time.Second,
@@ -65,7 +65,7 @@ func TestSinglyLinkedListSuite(t *testing.T) {
 
 var _ = ginkgo.Describe("Singly Linked BasicLinkedList Unit Tests", ginkgo.Ordered, ginkgo.Serial, func() {
 	ginkgo.It("singly linked list generation",
-		ginkgo.Label("SinglyLinkedList"),
+		ginkgo.Label("singlyLinkedList"),
 		func() {
 			slist := list.NewSinglyLinkedList[int]()
 			assert.NotNil(ginkgo.GinkgoT(), slist)
@@ -77,7 +77,7 @@ var _ = ginkgo.Describe("Singly Linked BasicLinkedList Unit Tests", ginkgo.Order
 		},
 	)
 	ginkgo.It("singly linked list generation with insert before/after",
-		ginkgo.Label("SinglyLinkedList"),
+		ginkgo.Label("singlyLinkedList"),
 		func() {
 			slist := list.NewSinglyLinkedList[int]()
 			assert.NotNil(ginkgo.GinkgoT(), slist)
@@ -95,7 +95,7 @@ var _ = ginkgo.Describe("Singly Linked BasicLinkedList Unit Tests", ginkgo.Order
 		},
 	)
 	ginkgo.It("singly linked list generation then find target node",
-		ginkgo.Label("SinglyLinkedList"),
+		ginkgo.Label("singlyLinkedList"),
 		func() {
 			slist := list.NewSinglyLinkedList[int]()
 			assert.NotNil(ginkgo.GinkgoT(), slist)
@@ -109,7 +109,7 @@ var _ = ginkgo.Describe("Singly Linked BasicLinkedList Unit Tests", ginkgo.Order
 		},
 	)
 	ginkgo.It("singly linked list generation then remove target node",
-		ginkgo.Label("SinglyLinkedList"),
+		ginkgo.Label("singlyLinkedList"),
 		func() {
 			slist := list.NewSinglyLinkedList[int]()
 			assert.NotNil(ginkgo.GinkgoT(), slist)
@@ -132,7 +132,7 @@ var _ = ginkgo.Describe("Singly Linked BasicLinkedList Unit Tests", ginkgo.Order
 		},
 	)
 	ginkgo.It("singly linked list generation, remove target node and insert nil node",
-		ginkgo.Label("SinglyLinkedList"),
+		ginkgo.Label("singlyLinkedList"),
 		func() {
 			slist := list.NewSinglyLinkedList[int]()
 			assert.NotNil(ginkgo.GinkgoT(), slist)
