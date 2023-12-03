@@ -7,6 +7,7 @@ package list
 type NodeElement[T comparable] interface {
 	HasNext() bool
 	GetNext() NodeElement[T]
+	HasPrev() bool
 	GetPrev() NodeElement[T]
 	GetValue() T
 	SetValue(v T) // Concurrent data race error

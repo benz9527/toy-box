@@ -44,6 +44,10 @@ func (e *nodeElement[T]) HasNext() bool {
 	return e.next != nil
 }
 
+func (e *nodeElement[T]) HasPrev() bool {
+	return e.prev != nil
+}
+
 func (e *nodeElement[T]) GetNext() NodeElement[T] {
 	if e.next == nil {
 		return nil
