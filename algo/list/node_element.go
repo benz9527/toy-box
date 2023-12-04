@@ -6,11 +6,26 @@ var (
 	_ NodeElement[struct{}] = (*nodeElement[struct{}])(nil) // Type check assertion
 )
 
+// Alignment and size
+// interface size is 16bytes
+// pointer size is 8bytes
+// string size is 16bytes
+// rune size is 4bytes
+// int8 size is 1byte
+// int16 size is 2bytes
+// int32 size is 4bytes
+// int size is 8bytes
+// int64 size is 8bytes
+// bool size is 1byte
+// byte size is 1byte
+// struct{} size is 0byte
+
 type nodeElement[T comparable] struct {
-	prev, next NodeElement[T]
-	list       BasicLinkedList[T]
-	lock       *sync.RWMutex
-	value      T
+	prev, next NodeElement[T]     // alignment 8bytes * 2; size 16bytes * 2
+	list       BasicLinkedList[T] // alignment 8bytes; size 16bytes
+	lock       *sync.RWMutex      // alignment 8bytes; size 8bytes
+	value      T                  // alignment 8bytes; size up to datatype. The type of value may be a small size type.
+	// It should be placed at the end of the struct to avoid take too much padding.
 }
 
 func NewNodeElement[T comparable](v T) NodeElement[T] {

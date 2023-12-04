@@ -4,6 +4,8 @@ package list
 // And the singly linked list could be implemented by using the doubly linked list.
 // So it is a meaningless exercise to implement the singly linked list.
 
+// NodeElement is the basic interface for node element.
+// Alignment of interface is 8 bytes and size of interface is 16 bytes.
 type NodeElement[T comparable] interface {
 	HasNext() bool
 	GetNext() NodeElement[T]
