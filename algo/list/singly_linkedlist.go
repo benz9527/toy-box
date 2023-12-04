@@ -180,14 +180,17 @@ func (l *singlyLinkedList[T]) Remove(targetE NodeElement[T]) NodeElement[T] {
 	return targetE
 }
 
-func (l *singlyLinkedList[T]) ForEach(fn func(e NodeElement[T])) {
+func (l *singlyLinkedList[T]) ForEach(fn func(idx int64, e NodeElement[T])) {
 	if fn == nil || l.len.Load() == 0 || l.getRootHeader() == l.getRoot() {
 		return
 	}
-	var iterator = l.getRoot()
+	var (
+		iterator       = l.getRoot()
+		idx      int64 = 0
+	)
 	for iterator.HasNext() {
-		fn(iterator.GetNext())
-		iterator = iterator.GetNext()
+		fn(idx, iterator.GetNext())
+		iterator, idx = iterator.GetNext(), idx+1
 	}
 }
 
@@ -270,7 +273,7 @@ func (l *concurrentSinglyLinkedList[T]) Remove(targetE NodeElement[T]) NodeEleme
 	return targetE
 }
 
-func (l *concurrentSinglyLinkedList[T]) ForEach(fn func(e NodeElement[T])) {
+func (l *concurrentSinglyLinkedList[T]) ForEach(fn func(idx int64, e NodeElement[T])) {
 	l.lock.RLock()
 	defer l.lock.RUnlock()
 	l.list.ForEach(fn)

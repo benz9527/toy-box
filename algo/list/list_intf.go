@@ -13,6 +13,7 @@ type NodeElement[T comparable] interface {
 	SetValue(v T) // Concurrent data race error
 }
 
+// BasicLinkedList is the basic interface for linked list. Serve as the singly linked list.
 type BasicLinkedList[T comparable] interface {
 	Len() int64
 	// Append appends the elements to the list l and returns the new elements.
@@ -28,12 +29,13 @@ type BasicLinkedList[T comparable] interface {
 	// Remove removes targetE from l if targetE is an element of list l and returns targetE or nil if list is empty.
 	Remove(targetE NodeElement[T]) NodeElement[T]
 	// ForEach traverses the list l and executes function fn for each element.
-	ForEach(fn func(e NodeElement[T]))
+	ForEach(fn func(idx int64, e NodeElement[T]))
 	// FindFirst finds the first element that satisfies the compareFn and returns the element and true if found.
 	// If compareFn is not provided, it will use the default compare function that compares the value of element.
 	FindFirst(v T, compareFn ...func(e NodeElement[T]) bool) (NodeElement[T], bool)
 }
 
+// LinkedList is the doubly linked list interface.
 type LinkedList[T comparable] interface {
 	BasicLinkedList[T]
 	// ReverseForEach iterates the list in reverse order, calling fn for each element,
@@ -43,12 +45,20 @@ type LinkedList[T comparable] interface {
 	Front() NodeElement[T]
 	// Back returns the last element of doubly linked list l or nil if the list is empty.
 	Back() NodeElement[T]
+	// PushFront inserts a new element e with value v at the front of list l and returns e.
 	PushFront(v T) NodeElement[T]
+	// PushBack inserts a new element e with value v at the back of list l and returns e.
 	PushBack(v T) NodeElement[T]
+	// MoveToFront moves element e to the front of list l.
 	MoveToFront(targetE NodeElement[T])
+	// MoveToBack moves element e to the back of list l.
 	MoveToBack(targetE NodeElement[T])
+	// MoveBefore moves element srcE in front of element dstE.
 	MoveBefore(srcE, dstE NodeElement[T])
+	// MoveAfter moves element srcE next to element dstE.
 	MoveAfter(srcE, dstE NodeElement[T])
+	// PushFrontList inserts a copy of another linked list at the front of list l.
 	PushFrontList(srcList LinkedList[T])
+	// PushBackList inserts a copy of another linked list at the back of list l.
 	PushBackList(srcList LinkedList[T])
 }

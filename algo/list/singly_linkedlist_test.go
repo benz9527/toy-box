@@ -71,7 +71,7 @@ var _ = ginkgo.Describe("Singly Linked BasicLinkedList Unit Tests", ginkgo.Order
 			assert.NotNil(ginkgo.GinkgoT(), slist)
 			slist.AppendValue(1, 2, 3)
 			assert.Equal(ginkgo.GinkgoT(), int64(3), slist.Len())
-			slist.ForEach(func(e list.NodeElement[int]) {
+			slist.ForEach(func(idx int64, e list.NodeElement[int]) {
 				ginkgo.GinkgoWriter.Printf("node element: %v\n", e.GetValue())
 			})
 		},
@@ -87,7 +87,7 @@ var _ = ginkgo.Describe("Singly Linked BasicLinkedList Unit Tests", ginkgo.Order
 			assert.Equal(ginkgo.GinkgoT(), int64(3), slist.Len())
 			expected := []int{2, 3, 1}
 			actual := make([]int, 0, 3)
-			slist.ForEach(func(e list.NodeElement[int]) {
+			slist.ForEach(func(idx int64, e list.NodeElement[int]) {
 				actual = append(actual, e.GetValue())
 				ginkgo.GinkgoWriter.Printf("node element: %v\n", e.GetValue())
 			})
@@ -124,7 +124,7 @@ var _ = ginkgo.Describe("Singly Linked BasicLinkedList Unit Tests", ginkgo.Order
 			assert.Equal(ginkgo.GinkgoT(), int64(3), slist.Len())
 			expected := []int{2, 1, 4}
 			actual := make([]int, 0, 3)
-			slist.ForEach(func(e list.NodeElement[int]) {
+			slist.ForEach(func(idx int64, e list.NodeElement[int]) {
 				actual = append(actual, e.GetValue())
 				ginkgo.GinkgoWriter.Printf("node element: %v\n", e.GetValue())
 			})
@@ -149,7 +149,7 @@ var _ = ginkgo.Describe("Singly Linked BasicLinkedList Unit Tests", ginkgo.Order
 			assert.Equal(ginkgo.GinkgoT(), int64(3), slist.Len())
 			expected := []int{2, 1, 4}
 			actual := make([]int, 0, 3)
-			slist.ForEach(func(e list.NodeElement[int]) {
+			slist.ForEach(func(idx int64, e list.NodeElement[int]) {
 				actual = append(actual, e.GetValue())
 				ginkgo.GinkgoWriter.Printf("node element: %v\n", e.GetValue())
 			})
@@ -193,7 +193,7 @@ var _ = ginkgo.Describe("Concurrent Singly Linked BasicLinkedList Unit Tests", f
 			expected1 := []int{1, 2, 4}
 			expected2 := []int{1, 2, 3, 4}
 			actual := make([]int, 0, 3)
-			slist.ForEach(func(e list.NodeElement[int]) {
+			slist.ForEach(func(idx int64, e list.NodeElement[int]) {
 				actual = append(actual, e.GetValue())
 				ginkgo.GinkgoWriter.Printf("node element: %v\n", e.GetValue())
 			})
