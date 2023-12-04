@@ -32,11 +32,11 @@ func (l *singlyLinkedList[T]) getRoot() NodeElement[T] {
 	return &l.root
 }
 
-func (l *singlyLinkedList[T]) getRootHeader() NodeElement[T] {
+func (l *singlyLinkedList[T]) getRootHead() NodeElement[T] {
 	return l.root.next
 }
 
-func (l *singlyLinkedList[T]) setRootHeader(targetE NodeElement[T]) {
+func (l *singlyLinkedList[T]) setRootHead(targetE NodeElement[T]) {
 	l.root.next = targetE
 }
 
@@ -49,7 +49,7 @@ func (l *singlyLinkedList[T]) setRootTail(targetE NodeElement[T]) {
 }
 
 func (l *singlyLinkedList[T]) init() *singlyLinkedList[T] {
-	l.setRootHeader(&l.root)
+	l.setRootHead(&l.root)
 	l.setRootTail(&l.root)
 	l.root.list = l
 	l.len.Store(0)
@@ -80,7 +80,7 @@ func (l *singlyLinkedList[T]) append(e NodeElement[T]) NodeElement[T] {
 		e.(*nodeElement[T]).list = l
 	}
 	if l.len.Load() <= 0 {
-		l.setRootHeader(e)
+		l.setRootHead(e)
 	} else {
 		l.getRootTail().(*nodeElement[T]).next = e
 	}
@@ -133,8 +133,8 @@ func (l *singlyLinkedList[T]) InsertBefore(v T, dstE NodeElement[T]) NodeElement
 
 	newE := newNodeElement[T](v, l)
 	var iterator NodeElement[T] = nil
-	if dstE == l.getRootHeader() {
-		l.setRootHeader(newE)
+	if dstE == l.getRootHead() {
+		l.setRootHead(newE)
 	} else {
 		iterator = l.getRoot()
 		for iterator.HasNext() && iterator.GetNext() != dstE {
@@ -158,7 +158,7 @@ func (l *singlyLinkedList[T]) Remove(targetE NodeElement[T]) NodeElement[T] {
 
 	defer func() {
 		if l.len.Load() == 0 {
-			l.setRootHeader(l.getRoot())
+			l.setRootHead(l.getRoot())
 			l.setRootTail(l.getRoot())
 		}
 	}()
@@ -181,7 +181,7 @@ func (l *singlyLinkedList[T]) Remove(targetE NodeElement[T]) NodeElement[T] {
 }
 
 func (l *singlyLinkedList[T]) ForEach(fn func(idx int64, e NodeElement[T])) {
-	if fn == nil || l.len.Load() == 0 || l.getRootHeader() == l.getRoot() {
+	if fn == nil || l.len.Load() == 0 || l.getRootHead() == l.getRoot() {
 		return
 	}
 	var (
@@ -195,7 +195,7 @@ func (l *singlyLinkedList[T]) ForEach(fn func(idx int64, e NodeElement[T])) {
 }
 
 func (l *singlyLinkedList[T]) FindFirst(targetV T, compareFn ...func(e NodeElement[T]) bool) (NodeElement[T], bool) {
-	if l.len.Load() == 0 || l.getRootHeader() == l.getRoot() {
+	if l.len.Load() == 0 || l.getRootHead() == l.getRoot() {
 		return nil, false
 	}
 

@@ -42,7 +42,7 @@ type LinkedList[T comparable] interface {
 	BasicLinkedList[T]
 	// ReverseForEach iterates the list in reverse order, calling fn for each element,
 	// until either all elements have been visited.
-	ReverseForEach(fn func(e NodeElement[T]))
+	ReverseForEach(fn func(idx int64, e NodeElement[T]))
 	// Front returns the first element of doubly linked list l or nil if the list is empty.
 	Front() NodeElement[T]
 	// Back returns the last element of doubly linked list l or nil if the list is empty.

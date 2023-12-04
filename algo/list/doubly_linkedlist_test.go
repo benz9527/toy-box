@@ -1,24 +1,23 @@
-package list_test
+package list
 
 import (
-	clist "container/list"
-	"github.com/stretchr/testify/assert"
+	"container/list"
 	"testing"
 
-	"github.com/benz9527/toy-box/algo/list"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestLinkedList_AppendValue(t *testing.T) {
-	dlist := list.NewLinkedList[int]()
+	dlist := NewLinkedList[int]()
 	elements := dlist.AppendValue(1, 2, 3, 4, 5)
 	assert.Equal(t, len(elements), 5)
-	dlist.ForEach(func(idx int64, e list.NodeElement[int]) {
+	dlist.ForEach(func(idx int64, e NodeElement[int]) {
 		t.Logf("index: %d, e: %v", idx, e)
 		assert.Equal(t, elements[idx], e)
 		t.Logf("addr: %p, return addr: %p", elements[idx], e)
 	})
 
-	dlist2 := clist.New()
+	dlist2 := list.New()
 	dlist2.PushBack(1)
 	dlist2.PushBack(2)
 	dlist2.PushBack(3)
@@ -37,7 +36,7 @@ func TestLinkedList_AppendValue(t *testing.T) {
 }
 
 func TestDoublyLinkedList_InsertBefore(t *testing.T) {
-	dlist := list.NewLinkedList[int]()
+	dlist := NewLinkedList[int]()
 	elements := dlist.AppendValue(1)
 	_2n := dlist.InsertBefore(2, elements[0])
 	_3n := dlist.InsertBefore(3, _2n)
@@ -45,7 +44,7 @@ func TestDoublyLinkedList_InsertBefore(t *testing.T) {
 	dlist.InsertBefore(5, _4n)
 	assert.Equal(t, int64(5), dlist.Len())
 
-	dlist2 := clist.New()
+	dlist2 := list.New()
 	_1n_2 := dlist2.PushBack(1)
 	_2n_2 := dlist2.InsertBefore(2, _1n_2)
 	_3n_2 := dlist2.InsertBefore(3, _2n_2)
@@ -64,7 +63,7 @@ func TestDoublyLinkedList_InsertBefore(t *testing.T) {
 }
 
 func TestDoublyLinkedList_InsertAfter(t *testing.T) {
-	dlist := list.NewLinkedList[int]()
+	dlist := NewLinkedList[int]()
 	elements := dlist.AppendValue(1)
 	_2n := dlist.InsertAfter(2, elements[0])
 	_3n := dlist.InsertAfter(3, _2n)
@@ -72,7 +71,7 @@ func TestDoublyLinkedList_InsertAfter(t *testing.T) {
 	dlist.InsertAfter(5, _4n)
 	assert.Equal(t, int64(5), dlist.Len())
 
-	dlist2 := clist.New()
+	dlist2 := list.New()
 	_1n_2 := dlist2.PushBack(1)
 	_2n_2 := dlist2.InsertAfter(2, _1n_2)
 	_3n_2 := dlist2.InsertAfter(3, _2n_2)
@@ -92,8 +91,8 @@ func TestDoublyLinkedList_InsertAfter(t *testing.T) {
 
 func TestLinkedList_AppendValueThenRemove(t *testing.T) {
 	t.Log("test linked list append value")
-	dlist := list.NewLinkedList[int]()
-	dlist2 := clist.New()
+	dlist := NewLinkedList[int]()
+	dlist2 := list.New()
 	checkItems := func() {
 		dlistItr := dlist.Front()
 		dlist2Itr := dlist2.Front()
@@ -106,7 +105,7 @@ func TestLinkedList_AppendValueThenRemove(t *testing.T) {
 
 	elements := dlist.AppendValue(1, 2, 3, 4, 5)
 	assert.Equal(t, len(elements), 5)
-	dlist.ForEach(func(idx int64, e list.NodeElement[int]) {
+	dlist.ForEach(func(idx int64, e NodeElement[int]) {
 		t.Logf("index: %d, e: %v", idx, e)
 		assert.Equal(t, elements[idx], e)
 		t.Logf("addr: %p, return addr: %p", elements[idx], e)
@@ -142,7 +141,7 @@ func TestLinkedList_AppendValueThenRemove(t *testing.T) {
 
 	t.Log("check released elements")
 	assert.Equal(t, int64(dlist2.Len()), dlist.Len())
-	dlist.ForEach(func(idx int64, e list.NodeElement[int]) {
+	dlist.ForEach(func(idx int64, e NodeElement[int]) {
 		t.Logf("index: %d, e: %v", idx, e)
 	})
 	for idx, e := range elements {
@@ -157,7 +156,7 @@ func TestLinkedList_AppendValueThenRemove(t *testing.T) {
 // BenchmarkNewLinkedList_AppendValue
 // BenchmarkNewLinkedList_AppendValue-4   	 3138679	       394.3 ns/op	      88 B/op	       3 allocs/op
 func BenchmarkNewLinkedList_AppendValue(b *testing.B) {
-	dlist := list.NewLinkedList[int]()
+	dlist := NewLinkedList[int]()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		dlist.AppendValue(i)
@@ -172,10 +171,128 @@ func BenchmarkNewLinkedList_AppendValue(b *testing.B) {
 // BenchmarkSDKLinkedList_PushBack
 // BenchmarkSDKLinkedList_PushBack-4   	 4632534	       237.2 ns/op	      55 B/op	       1 allocs/op
 func BenchmarkSDKLinkedList_PushBack(b *testing.B) {
-	dlist := clist.New()
+	dlist := list.New()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		dlist.PushBack(i)
 	}
 	b.ReportAllocs()
+}
+
+func TestLinkedList_InsertAfterAndMove(t *testing.T) {
+	dlist := NewLinkedList[int]()
+	dlist2 := list.New()
+	checkItems := func() {
+		dlistItr := dlist.Front()
+		dlist2Itr := dlist2.Front()
+		assert.NotNil(t, dlistItr)
+		assert.NotNil(t, dlist2Itr)
+		assert.Equal(t, int64(dlist2.Len()), dlist.Len())
+		for dlist2Itr != nil {
+			assert.Equal(t, dlist2Itr.Value, dlistItr.GetValue())
+			dlist2Itr = dlist2Itr.Next()
+			dlistItr = dlistItr.GetNext()
+		}
+	}
+
+	elements := dlist.AppendValue(1, 2, 3, 4, 5)
+	_6n := dlist.InsertAfter(6, elements[len(elements)-1])
+	_7n := dlist.InsertBefore(7, elements[0])
+	assert.Equal(t, int64(7), dlist.Len())
+	dlist.ForEach(func(idx int64, e NodeElement[int]) {
+		t.Logf("index: %d, addr: %p, e: %v", idx, e, e)
+	})
+	dlist.ReverseForEach(func(idx int64, e NodeElement[int]) {
+		t.Logf("reverse: index: %d, addr: %p, e: %v", idx, e, e)
+	})
+
+	dlist2.PushBack(1)
+	dlist2.PushBack(2)
+	dlist2.PushBack(3)
+	dlist2.PushBack(4)
+	dlist2.PushBack(5)
+	_6n_2 := dlist2.InsertAfter(6, dlist2.Back())
+	_7n_2 := dlist2.InsertBefore(7, dlist2.Front())
+	assert.Equal(t, int64(dlist2.Len()), dlist.Len())
+	checkItems()
+
+	t.Log("test move after")
+	dlist.MoveToBack(_7n)
+	dlist2.MoveToBack(_7n_2)
+	checkItems()
+	dlist.ForEach(func(idx int64, e NodeElement[int]) {
+		t.Logf("index: %d, addr: %p, e: %v", idx, e, e)
+	})
+	dlist.ReverseForEach(func(idx int64, e NodeElement[int]) {
+		t.Logf("reverse: index: %d, addr: %p, e: %v", idx, e, e)
+	})
+
+	t.Log("test move to front")
+	dlist.MoveToFront(_6n)
+	dlist2.MoveToFront(_6n_2)
+	checkItems()
+	dlist.ForEach(func(idx int64, e NodeElement[int]) {
+		t.Logf("index: %d, addr: %p, e: %v", idx, e, e)
+	})
+	dlist.ReverseForEach(func(idx int64, e NodeElement[int]) {
+		t.Logf("reverse: index: %d, addr: %p, e: %v", idx, e, e)
+	})
+
+	t.Log("test move before")
+	dlist.MoveBefore(_6n, _7n)
+	dlist2.MoveBefore(_6n_2, _7n_2)
+	checkItems()
+	dlist.ForEach(func(idx int64, e NodeElement[int]) {
+		t.Logf("index: %d, addr: %p, e: %v", idx, e, e)
+	})
+	dlist.ReverseForEach(func(idx int64, e NodeElement[int]) {
+		t.Logf("reverse: index: %d, addr: %p, e: %v", idx, e, e)
+	})
+
+	t.Log("test move after")
+	dlist.MoveAfter(_7n, dlist.Front())
+	dlist2.MoveAfter(_7n_2, dlist2.Front())
+	checkItems()
+	dlist.ForEach(func(idx int64, e NodeElement[int]) {
+		t.Logf("index: %d, addr: %p, e: %v", idx, e, e)
+	})
+	dlist.ReverseForEach(func(idx int64, e NodeElement[int]) {
+		t.Logf("reverse: index: %d, addr: %p, e: %v", idx, e, e)
+	})
+
+	t.Log("test push front list")
+	dlist_1 := NewLinkedList[int]()
+	dlist_1.AppendValue(8, 9, 10)
+	dlist2_1 := list.New()
+	dlist2_1.PushBack(8)
+	dlist2_1.PushBack(9)
+	dlist2_1.PushBack(10)
+
+	dlist.PushFrontList(dlist_1)
+	dlist2.PushFrontList(dlist2_1)
+	checkItems()
+	dlist.ForEach(func(idx int64, e NodeElement[int]) {
+		t.Logf("index: %d, addr: %p, e: %v", idx, e, e)
+	})
+	dlist.ReverseForEach(func(idx int64, e NodeElement[int]) {
+		t.Logf("reverse: index: %d, addr: %p, e: %v", idx, e, e)
+	})
+
+	t.Log("test push back list")
+	dlist_2 := NewLinkedList[int]()
+	dlist_2.AppendValue(11, 12, 13)
+	dlist2_2 := list.New()
+	dlist2_2.PushBack(11)
+	dlist2_2.PushBack(12)
+	dlist2_2.PushBack(13)
+
+	dlist.PushBackList(dlist_2)
+	dlist2.PushBackList(dlist2_2)
+	checkItems()
+	dlist.ForEach(func(idx int64, e NodeElement[int]) {
+		t.Logf("index: %d, addr: %p, e: %v", idx, e, e)
+	})
+	dlist.ReverseForEach(func(idx int64, e NodeElement[int]) {
+		t.Logf("reverse: index: %d, addr: %p, e: %v", idx, e, e)
+	})
 }
