@@ -31,5 +31,6 @@ type DQItem[E comparable] interface {
 
 type DelayQueue[E comparable] interface {
 	Offer(item E, expiration int64) error
-	Poll(ctx context.Context, nowFn func() int64) (<-chan E, error) // Async function
+	Poll(ctx context.Context, nowFn func() int64) (<-chan E, error)          // Async function
+	PollToChannel(ctx context.Context, nowFn func() int64, C chan<- E) error // Async function
 }

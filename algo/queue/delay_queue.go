@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -98,71 +99,83 @@ func (dq *arrayDQ[E]) Offer(item E, expiration int64) error {
 	return nil
 }
 
+func (dq *arrayDQ[E]) poll(ctx context.Context, nowFn func() int64, sender chan<- E, closeChAfterFinish bool) {
+	dq.mu.Lock() // Avoid concurrent execution of Poll()
+	defer func() {
+		// FIXME recover defer execution order
+		if err := recover(); err != nil {
+			slog.Error("delay queue panic recover", "error", err)
+		}
+		// before exit
+		atomic.StoreInt32(&dq.sleeping, wakeUpToWork)
+		if closeChAfterFinish && sender != nil {
+			close(sender)
+		}
+		dq.mu.Unlock()
+	}()
+	for {
+		now := nowFn()
+		dq.lock.RLock() // Concurrency control, avoid long time lock, block Offer()
+		item, deltaMs := dq.popIfExpired(now)
+		if item == nil {
+			// No expired item in the queue
+			// 1. without any item in the queue
+			// 2. all items in the queue are not expired
+			atomic.StoreInt32(&dq.sleeping, goToSleep)
+		}
+		dq.lock.RUnlock()
+
+		if item == nil {
+			if deltaMs == 0 {
+				// Queue is empty, waiting for new item
+				select {
+				case <-ctx.Done():
+					return
+				case <-dq.wakeUpC:
+					// Waiting for an immediately executed item
+					continue
+				}
+			} else if deltaMs > 0 {
+				select {
+				case <-ctx.Done():
+					return
+				case <-dq.wakeUpC:
+					continue
+				case <-time.After(time.Duration(deltaMs) * time.Millisecond):
+					// Waiting for this item to be expired
+					if atomic.SwapInt32(&dq.sleeping, wakeUpToWork) == wakeUpToWork {
+						// block the Offer() method
+						<-dq.wakeUpC
+					}
+					continue
+				}
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case sender <- item.GetValue():
+			// Waiting for the consumer to consume this item
+			// If external channel is closed, here will be panic
+		}
+	}
+}
+
 func (dq *arrayDQ[E]) Poll(ctx context.Context, nowFn func() int64) (<-chan E, error) {
 	if ctx == nil {
 		return nil, errEmptyContext
 	}
-	dq.mu.Lock() // Avoid concurrent execution of Poll()
 	resultC := make(chan E)
 	// FIXME using goroutine pool
-	go func(sender chan<- E) {
-		defer func() {
-			// FIXME recover defer execution order
-			if err := recover(); err != nil {
-			}
-			// before exit
-			atomic.StoreInt32(&dq.sleeping, wakeUpToWork)
-			if sender != nil {
-				close(sender)
-			}
-			dq.mu.Unlock()
-		}()
-		for {
-			now := nowFn()
-			dq.lock.RLock() // Concurrency control, avoid long time lock, block Offer()
-			item, deltaMs := dq.popIfExpired(now)
-			if item == nil {
-				// No expired item in the queue
-				// 1. without any item in the queue
-				// 2. all items in the queue are not expired
-				atomic.StoreInt32(&dq.sleeping, goToSleep)
-			}
-			dq.lock.RUnlock()
-
-			if item == nil {
-				if deltaMs == 0 {
-					// Queue is empty, waiting for new item
-					select {
-					case <-ctx.Done():
-						return
-					case <-dq.wakeUpC:
-						// Waiting for an immediately executed item
-						continue
-					}
-				} else if deltaMs > 0 {
-					select {
-					case <-ctx.Done():
-						return
-					case <-dq.wakeUpC:
-						continue
-					case <-time.After(time.Duration(deltaMs) * time.Millisecond):
-						// Waiting for this item to be expired
-						if atomic.SwapInt32(&dq.sleeping, wakeUpToWork) == wakeUpToWork {
-							// block the Offer() method
-							<-dq.wakeUpC
-						}
-						continue
-					}
-				}
-			}
-
-			select {
-			case <-ctx.Done():
-				return
-			case sender <- item.GetValue():
-				// Waiting for the consumer to consume this item
-			}
-		}
-	}(resultC)
+	go dq.poll(ctx, nowFn, resultC, true)
 	return resultC, nil
+}
+
+func (dq *arrayDQ[E]) PollToChannel(ctx context.Context, nowFn func() int64, C chan<- E) error {
+	if ctx == nil {
+		return errEmptyContext
+	}
+	go dq.poll(ctx, nowFn, C, false)
+	return nil
 }

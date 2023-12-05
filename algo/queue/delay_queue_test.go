@@ -61,3 +61,41 @@ func TestDelayQueue_Poll(t *testing.T) {
 		}
 	}
 }
+
+func TestDelayQueue_PollToChannel(t *testing.T) {
+	ms := time.Now().UnixMilli()
+	dq := NewArrayDelayQueue[*person](32)
+	_ = dq.Offer(&person{age: 10, name: "p0", salary: ms + 110}, ms+110)
+	_ = dq.Offer(&person{age: 101, name: "p1", salary: ms + 501}, ms+501)
+	_ = dq.Offer(&person{age: 10, name: "p2", salary: ms + 155}, ms+155)
+	_ = dq.Offer(&person{age: 200, name: "p3", salary: ms + 210}, ms+210)
+	_ = dq.Offer(&person{age: 3, name: "p4", salary: ms + 60}, ms+60)
+	_ = dq.Offer(&person{age: 1, name: "p5", salary: ms + 110}, ms+110)
+	_ = dq.Offer(&person{age: 5, name: "p6", salary: ms + 250}, ms+250)
+	_ = dq.Offer(&person{age: 200, name: "p7", salary: ms + 301}, ms+301)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	receiver := make(chan *person)
+	err := dq.PollToChannel(ctx,
+		func() int64 {
+			return time.Now().UnixMilli()
+		},
+		receiver,
+	)
+	assert.NoError(t, err)
+	time.AfterFunc(200*time.Millisecond, func() {
+		close(receiver)
+	})
+	for {
+		select {
+		case item, ok := <-receiver:
+			if !ok {
+				t.Log("receiver channel closed")
+				time.Sleep(100 * time.Millisecond)
+				return
+			}
+			t.Logf("current time ms: %d, item: %v\n", time.Now().UnixMilli(), item)
+		}
+	}
+}
