@@ -5,5 +5,5 @@ import (
 )
 
 func TestBenchmarkSelectSort(t *testing.T) {
-	LogarithmicDetector(SelectSort, 1000, 100, 100, true)
+	DataComparator(SelectSort, 1000, 100, 100, true)
 }

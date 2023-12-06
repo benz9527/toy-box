@@ -5,5 +5,5 @@ import (
 )
 
 func TestHeapSort(t *testing.T) {
-	LogarithmicDetector(HeapSort, 1000, 10, 100, true)
+	DataComparator(HeapSort, 1000, 10, 100, true)
 }

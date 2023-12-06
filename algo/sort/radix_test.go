@@ -5,5 +5,5 @@ import (
 )
 
 func TestRadixSort(t *testing.T) {
-	LogarithmicDetector(RadixSort, 1000, 10, 500, true)
+	DataComparator(RadixSort, 1000, 10, 500, true)
 }

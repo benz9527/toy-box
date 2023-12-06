@@ -5,5 +5,5 @@ import (
 )
 
 func TestMergeSort(t *testing.T) {
-	LogarithmicDetector(MergeSort, 1000, 100, 100, true)
+	DataComparator(MergeSort, 1000, 100, 100, true)
 }

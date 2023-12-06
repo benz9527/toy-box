@@ -58,7 +58,7 @@ func PrintArr(arr []int) {
 	fmt.Println(arr)
 }
 
-func LogarithmicDetector(sf sortFunc, benchmarkNum int, maxArrSize int, maxNum int, isAsc bool) {
+func DataComparator(sf sortFunc, benchmarkNum int, maxArrSize int, maxNum int, isAsc bool) {
 	equals := true
 	for i := 0; i < benchmarkNum; i++ {
 		originArr := GenerateRandomArr(maxArrSize, maxNum)

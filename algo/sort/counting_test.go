@@ -5,5 +5,5 @@ import (
 )
 
 func TestCountingSort(t *testing.T) {
-	LogarithmicDetector(CountingSort, 1000, 10, 100, true)
+	DataComparator(CountingSort, 1000, 10, 100, true)
 }

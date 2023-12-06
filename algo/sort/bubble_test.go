@@ -28,8 +28,8 @@ func TestBubbleSort(t *testing.T) {
 }
 
 func TestBubbleSortBenchmark(t *testing.T) {
-	LogarithmicDetector(BubbleSort, 1000, 20, 100, true)
-	LogarithmicDetector(BubbleSortAcc, 1000, 20, 100, true)
+	DataComparator(BubbleSort, 1000, 20, 100, true)
+	DataComparator(BubbleSortAcc, 1000, 20, 100, true)
 }
 
 func TestBubbleSortAcc(t *testing.T) {
