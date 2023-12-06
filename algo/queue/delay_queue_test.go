@@ -13,18 +13,18 @@ func TestDelayQueueAlignmentAndSize(t *testing.T) {
 	t.Logf("dq aligment size: %d\n", unsafe.Alignof(dq))
 	prototype := dq.(*arrayDQ[*person])
 	t.Logf("dq prototype alignment size: %d\n", unsafe.Alignof(prototype))
-	t.Logf("dq prototype item channel alignment size: %d\n", unsafe.Alignof(prototype.itemC))
 	t.Logf("dq prototype wake up channel alignment size: %d\n", unsafe.Alignof(prototype.wakeUpC))
 	t.Logf("dq prototype priority queue alignment size: %d\n", unsafe.Alignof(prototype.pq))
 	t.Logf("dq prototype sleeping alignment size: %d\n", unsafe.Alignof(prototype.sleeping))
+	t.Logf("dq prototype mu alignment size: %d\n", unsafe.Alignof(prototype.mu))
 	t.Logf("dq prototype lock alignment size: %d\n", unsafe.Alignof(prototype.lock))
 
 	t.Logf("dq size: %d\n", unsafe.Sizeof(dq))
 	t.Logf("dq prototype size: %d\n", unsafe.Sizeof(prototype))
-	t.Logf("dq prototype item channel size: %d\n", unsafe.Sizeof(prototype.itemC))
 	t.Logf("dq prototype wake up channel size: %d\n", unsafe.Sizeof(prototype.wakeUpC))
 	t.Logf("dq prototype priority queue size: %d\n", unsafe.Sizeof(prototype.pq))
 	t.Logf("dq prototype sleeping size: %d\n", unsafe.Sizeof(prototype.sleeping))
+	t.Logf("dq prototype mu size: %d\n", unsafe.Sizeof(prototype.mu))
 	t.Logf("dq prototype lock size: %d\n", unsafe.Sizeof(prototype.lock))
 
 	assert.Equal(t, uintptr(48), unsafe.Sizeof(*prototype))
@@ -44,17 +44,20 @@ func TestDelayQueue_Poll(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	go dq.Poll(ctx,
+	receiver, err := dq.Poll(ctx,
 		func() int64 {
 			return time.Now().UnixMilli()
 		},
 	)
+	assert.NoError(t, err)
 	for {
 		select {
-		case item := <-dq.Wait():
+		case item, ok := <-receiver:
+			if !ok {
+				t.Log("receiver channel closed")
+				return
+			}
 			t.Logf("current time ms: %d, item: %v\n", time.Now().UnixMilli(), item)
-		case <-ctx.Done():
-			return
 		}
 	}
 }

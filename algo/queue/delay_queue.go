@@ -2,9 +2,14 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
+)
+
+var (
+	errEmptyContext = errors.New("empty context")
 )
 
 type dqItem[E comparable] struct {
@@ -35,9 +40,9 @@ const (
 // size: 48
 type arrayDQ[E comparable] struct {
 	pq       PriorityQueue[E] // alignment size: 8; size: 16
-	itemC    chan E           // alignment size: 8; size: 8
 	wakeUpC  chan struct{}    // alignment size: 8; size: 8
 	lock     *sync.RWMutex    // alignment size: 8; size: 8
+	mu       *sync.Mutex      // alignment size: 8; size: 8
 	sleeping int32            // alignment size: 4; size: 4
 }
 
@@ -56,9 +61,9 @@ func NewArrayDelayQueue[E comparable](
 		}
 	}
 	return &arrayDQ[E]{
-		itemC:   make(chan E, capacity),
 		wakeUpC: make(chan struct{}),
 		pq:      NewArrayPriorityQueue[E](capacity, comparator[0]),
+		mu:      &sync.Mutex{},
 		lock:    &sync.RWMutex{},
 	}
 }
@@ -93,60 +98,71 @@ func (dq *arrayDQ[E]) Offer(item E, expiration int64) error {
 	return nil
 }
 
-func (dq *arrayDQ[E]) Wait() <-chan E {
-	return dq.itemC
-}
+func (dq *arrayDQ[E]) Poll(ctx context.Context, nowFn func() int64) (<-chan E, error) {
+	if ctx == nil {
+		return nil, errEmptyContext
+	}
+	dq.mu.Lock() // Avoid concurrent execution of Poll()
+	resultC := make(chan E)
+	// FIXME using goroutine pool
+	go func(sender chan<- E) {
+		defer func() {
+			// FIXME recover defer execution order
+			if err := recover(); err != nil {
+			}
+			// before exit
+			atomic.StoreInt32(&dq.sleeping, wakeUpToWork)
+			if sender != nil {
+				close(sender)
+			}
+			dq.mu.Unlock()
+		}()
+		for {
+			now := nowFn()
+			dq.lock.RLock() // Concurrency control, avoid long time lock, block Offer()
+			item, deltaMs := dq.popIfExpired(now)
+			if item == nil {
+				// No expired item in the queue
+				// 1. without any item in the queue
+				// 2. all items in the queue are not expired
+				atomic.StoreInt32(&dq.sleeping, goToSleep)
+			}
+			dq.lock.RUnlock()
 
-func (dq *arrayDQ[E]) Poll(ctx context.Context, nowFn func() int64) {
-	defer func() {
-		// before exit
-		atomic.StoreInt32(&dq.sleeping, wakeUpToWork)
-	}()
-
-	for {
-		now := nowFn()
-		dq.lock.Lock()
-		item, deltaMs := dq.popIfExpired(now)
-		if item == nil {
-			// No expired item in the queue
-			// 1. without any item in the queue
-			// 2. all items in the queue are not expired
-			atomic.StoreInt32(&dq.sleeping, goToSleep)
-		}
-		dq.lock.Unlock()
-
-		if item == nil {
-			if deltaMs == 0 {
-				// Queue is empty, waiting for new item
-				select {
-				case <-ctx.Done():
-					return
-				case <-dq.wakeUpC:
-					// Waiting for an immediately executed item
-					continue
-				}
-			} else if deltaMs > 0 {
-				select {
-				case <-ctx.Done():
-					return
-				case <-dq.wakeUpC:
-					continue
-				case <-time.After(time.Duration(deltaMs) * time.Millisecond):
-					// Waiting for this item to be expired
-					if atomic.SwapInt32(&dq.sleeping, wakeUpToWork) == wakeUpToWork {
-						// block the Offer() method
-						<-dq.wakeUpC
+			if item == nil {
+				if deltaMs == 0 {
+					// Queue is empty, waiting for new item
+					select {
+					case <-ctx.Done():
+						return
+					case <-dq.wakeUpC:
+						// Waiting for an immediately executed item
+						continue
 					}
-					continue
+				} else if deltaMs > 0 {
+					select {
+					case <-ctx.Done():
+						return
+					case <-dq.wakeUpC:
+						continue
+					case <-time.After(time.Duration(deltaMs) * time.Millisecond):
+						// Waiting for this item to be expired
+						if atomic.SwapInt32(&dq.sleeping, wakeUpToWork) == wakeUpToWork {
+							// block the Offer() method
+							<-dq.wakeUpC
+						}
+						continue
+					}
 				}
 			}
-		}
 
-		select {
-		case <-ctx.Done():
-			return
-		case dq.itemC <- item.GetValue():
-			// Waiting for the consumer to consume this item
+			select {
+			case <-ctx.Done():
+				return
+			case sender <- item.GetValue():
+				// Waiting for the consumer to consume this item
+			}
 		}
-	}
+	}(resultC)
+	return resultC, nil
 }
