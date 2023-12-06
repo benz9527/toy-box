@@ -7,12 +7,13 @@ import (
 )
 
 type person struct {
-	name string
-	age  int
+	name   string
+	age    int
+	salary int64
 }
 
 func TestPriorityQueue_MinValueAsHighPriority(t *testing.T) {
-	pq := NewArrayPriorityQueue[*person, PQItem[*person]](32,
+	pq := NewArrayPriorityQueue[*person](32,
 		func(i, j PQItem[*person]) bool {
 			return i.GetPriority() < j.GetPriority()
 		},
@@ -34,7 +35,7 @@ func TestPriorityQueue_MinValueAsHighPriority(t *testing.T) {
 }
 
 func TestPriorityQueue_MaxValueAsHighPriority(t *testing.T) {
-	pq := NewArrayPriorityQueue[*person, PQItem[*person]](32,
+	pq := NewArrayPriorityQueue[*person](32,
 		func(i, j PQItem[*person]) bool {
 			return i.GetPriority() > j.GetPriority()
 		},
@@ -69,7 +70,7 @@ func BenchmarkPriorityQueue_Push(b *testing.B) {
 		list = append(list, e)
 	}
 	b.ResetTimer()
-	pq := NewArrayPriorityQueue[*person, PQItem[*person]](32,
+	pq := NewArrayPriorityQueue[*person](32,
 		func(i, j PQItem[*person]) bool {
 			return i.GetPriority() < j.GetPriority()
 		},
@@ -92,7 +93,7 @@ func BenchmarkPriorityQueue_Pop(b *testing.B) {
 		e := NewPQItem[*person](&person{age: i, name: fmt.Sprintf("p%d", i)}, int64(i))
 		list = append(list, e)
 	}
-	pq := NewArrayPriorityQueue[*person, PQItem[*person]](32)
+	pq := NewArrayPriorityQueue[*person](32)
 	for i := 0; i < b.N; i++ {
 		pq.Push(list[i])
 	}
