@@ -20,9 +20,8 @@ type PQItem[E comparable] interface {
 type PriorityQueue[E comparable] interface {
 	Len() int64
 	Push(item PQItem[E])
-	Pop() (PQItem[E], error)
-	Peek() (PQItem[E], error)
-	PopIfMatched(boundary int64) (PQItem[E], int64)
+	Pop() PQItem[E]
+	Peek() PQItem[E]
 }
 
 type DQItem[E comparable] interface {

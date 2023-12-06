@@ -4,12 +4,29 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"unsafe"
 )
 
 type person struct {
 	name   string
 	age    int
 	salary int64
+}
+
+func TestPriorityQueueItemAlignmentAndSize(t *testing.T) {
+	item := NewPQItem[*person](&person{age: 10, name: "p0"}, 1)
+	t.Logf("item alignment size: %d\n", unsafe.Alignof(item))
+	prototype := item.(*pqItem[*person])
+	t.Logf("item prototype alignment size: %d\n", unsafe.Alignof(prototype))
+	t.Logf("item prototype value alignment size: %d\n", unsafe.Alignof(prototype.value))
+	t.Logf("item prototype priority alignment size: %d\n", unsafe.Alignof(prototype.priority))
+	t.Logf("item prototype index alignment size: %d\n", unsafe.Alignof(prototype.index))
+	t.Logf("item prototype comparator alignment size: %d\n", unsafe.Alignof(prototype.comparator))
+	t.Logf("item prototype size: %d\n", unsafe.Sizeof(prototype))
+	t.Logf("item prototype value size: %d\n", unsafe.Sizeof(prototype.value))
+	t.Logf("item prototype priority size: %d\n", unsafe.Sizeof(prototype.priority))
+	t.Logf("item prototype index size: %d\n", unsafe.Sizeof(prototype.index))
+	t.Logf("item prototype comparator size: %d\n", unsafe.Sizeof(prototype.comparator))
 }
 
 func TestPriorityQueue_MinValueAsHighPriority(t *testing.T) {
@@ -28,7 +45,7 @@ func TestPriorityQueue_MinValueAsHighPriority(t *testing.T) {
 
 	expectedPriorities := []int64{1, 1, 3, 5, 10, 101, 200}
 	for i, priority := range expectedPriorities {
-		item, _ := pq.Pop()
+		item := pq.Pop()
 		t.Logf("%v， priority: %d", item.GetValue(), item.GetPriority())
 		assert.Equal(t, priority, item.GetPriority(), "priority", i)
 	}
@@ -51,7 +68,7 @@ func TestPriorityQueue_MaxValueAsHighPriority(t *testing.T) {
 
 	expectedPriorities := []int64{201, 200, 101, 10, 5, 3, 1, 1}
 	for i, priority := range expectedPriorities {
-		item, _ := pq.Pop()
+		item := pq.Pop()
 		t.Logf("%v， priority: %d", item.GetValue(), item.GetPriority())
 		assert.Equal(t, priority, item.GetPriority(), "priority", i)
 	}
@@ -99,7 +116,7 @@ func BenchmarkPriorityQueue_Pop(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = pq.Pop()
+		_ = pq.Pop()
 	}
 	b.ReportAllocs()
 }

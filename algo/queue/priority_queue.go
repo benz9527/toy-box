@@ -2,7 +2,6 @@ package queue
 
 import (
 	"container/heap"
-	"errors"
 )
 
 // 使用最小堆来构建优先级队列
@@ -13,10 +12,10 @@ import (
 // 新加入节点也会重新排列分布
 
 type pqItem[E comparable] struct {
-	value      E
-	priority   int64
-	index      int64
-	comparator LessThan[E]
+	priority   int64       // alignment size: 8; size: 8
+	index      int64       // alignment size: 8; size: 8
+	comparator LessThan[E] // alignment size: 8; size: 8
+	value      E           // based on the type of E
 }
 
 func (item *pqItem[E]) GetPriority() int64 {
@@ -67,41 +66,45 @@ func NewPQItem[T comparable](value T, priority int64) PQItem[T] {
 
 type arrayPQ[E comparable] []PQItem[E]
 
-func (q *arrayPQ[E]) Len() int {
-	return len(*q)
+func (pq *arrayPQ[E]) Len() int {
+	return len(*pq)
 }
 
-func (q *arrayPQ[E]) Less(i, j int) bool {
+func (pq *arrayPQ[E]) Less(i, j int) bool {
 	// Nil panic at your own risk
-	return (*q)[i].GetLessThan()((*q)[i], (*q)[j])
+	return (*pq)[i].GetLessThan()((*pq)[i], (*pq)[j])
 }
 
-func (q *arrayPQ[E]) Swap(i, j int) {
-	(*q)[i], (*q)[j] = (*q)[j], (*q)[i]
-	(*q)[i].SetIndex(int64(i))
-	(*q)[j].SetIndex(int64(j))
+func (pq *arrayPQ[E]) Swap(i, j int) {
+	(*pq)[i], (*pq)[j] = (*pq)[j], (*pq)[i]
+	(*pq)[i].SetIndex(int64(i))
+	(*pq)[j].SetIndex(int64(j))
 }
 
-func (q *arrayPQ[E]) Pop() interface{} {
-	prev := *q
+func (pq *arrayPQ[E]) Pop() interface{} {
+	prev := *pq
 	n := len(prev)
+	if n <= 0 {
+		return nil
+	}
+
 	item := prev[n-1]
 	item.SetIndex(-1)
 	prev[n-1] = *new(PQItem[E]) // nil object
-	*q = prev[:n-1]
+	*pq = prev[:n-1]
 	return item
 }
 
-func (q *arrayPQ[E]) Push(i interface{}) {
+func (pq *arrayPQ[E]) Push(i interface{}) {
 	item, ok := i.(PQItem[E])
 	if !ok {
 		return
 	}
 
-	prev := *q
+	prev := *pq
 	n := len(prev)
 	item.SetIndex(int64(n))
-	*q = append(*q, item.(PQItem[E]))
+	*pq = append(*pq, item.(PQItem[E]))
 }
 
 type ArrayPriorityQueue[E comparable] struct {
@@ -137,13 +140,12 @@ func (pq *ArrayPriorityQueue[E]) Len() int64 {
 	return int64(len(pq.queue))
 }
 
-func (pq *ArrayPriorityQueue[E]) Pop() (PQItem[E], error) {
+func (pq *ArrayPriorityQueue[E]) Pop() (nilItem PQItem[E]) {
 	if len(pq.queue) == 0 {
-		nilT := new(PQItem[E])
-		return *nilT, errors.New("empty")
+		return nil
 	}
 	item := heap.Pop(&pq.queue)
-	return item.(PQItem[E]), nil
+	return item.(PQItem[E])
 }
 
 func (pq *ArrayPriorityQueue[E]) Push(item PQItem[E]) {
@@ -151,24 +153,9 @@ func (pq *ArrayPriorityQueue[E]) Push(item PQItem[E]) {
 	heap.Push(&pq.queue, item)
 }
 
-func (pq *ArrayPriorityQueue[E]) Peek() (PQItem[E], error) {
+func (pq *ArrayPriorityQueue[E]) Peek() PQItem[E] {
 	if len(pq.queue) == 0 {
-		nilT := new(PQItem[E])
-		return *nilT, errors.New("empty")
+		return nil
 	}
-	return pq.queue[0], nil
-}
-
-func (pq *ArrayPriorityQueue[E]) PopIfMatched(boundary int64) (PQItem[E], int64) {
-	nilT := new(PQItem[E])
-	if (*pq).queue.Len() == 0 {
-		return *nilT, 0
-	}
-	item := (*pq).queue[0]
-	if item.GetPriority() > boundary {
-		// not matched
-		return *nilT, item.GetPriority() - boundary
-	}
-	heap.Remove(&(*pq).queue, 0)
-	return item, 0
+	return pq.queue[0]
 }
