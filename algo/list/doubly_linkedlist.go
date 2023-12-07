@@ -12,6 +12,7 @@ type nodeElementInListStatus uint8
 
 const (
 	notInList nodeElementInListStatus = iota
+	emtpyList
 	theOnlyOne
 	theFirstButNotTheLast
 	theLastButNotTheFirst
@@ -64,8 +65,11 @@ func (l *doublyLinkedList[T]) checkElement(targetE NodeElement[T]) (*nodeElement
 		return nil, notInList
 	}
 	at, ok := targetE.(*nodeElement[T])
-	if !ok || l.len.Load() == 0 || at.list != l || at.hasLock() != l.root.hasLock() {
+	if !ok || at.list != l || at.hasLock() != l.root.hasLock() {
 		return nil, notInList
+	}
+	if l.len.Load() == 0 {
+		return l.getRoot().(*nodeElement[T]), emtpyList
 	}
 
 	// mem address compare
@@ -155,17 +159,19 @@ func (l *doublyLinkedList[T]) AppendValue(values ...T) []NodeElement[T] {
 }
 
 func (l *doublyLinkedList[T]) insertAfter(newE, at *nodeElement[T]) *nodeElement[T] {
-	if at != l.getRoot() {
-		newE.prev = at
-	} else {
+	if at == l.getRoot() {
 		newE.prev = nil
+		newE.next = nil
+		l.setRootHead(newE)
+		l.setRootTail(newE)
+	} else {
+		newE.prev = at
+		newE.next = at.GetNext()
+		at.next = newE
+		if newE.GetNext() != nil {
+			newE.GetNext().(*nodeElement[T]).prev = newE
+		}
 	}
-	newE.next = at.GetNext()
-	at.next = newE
-	if newE.GetNext() != nil {
-		newE.GetNext().(*nodeElement[T]).prev = newE
-	}
-
 	l.len.Add(1)
 	return newE
 }
@@ -175,6 +181,7 @@ func (l *doublyLinkedList[T]) InsertAfter(v T, dstE NodeElement[T]) NodeElement[
 	if status == notInList {
 		return nil
 	}
+
 	newE := newNodeElement(v, l)
 	newE = l.insertAfter(newE, at)
 	switch status {
@@ -188,15 +195,18 @@ func (l *doublyLinkedList[T]) InsertAfter(v T, dstE NodeElement[T]) NodeElement[
 
 func (l *doublyLinkedList[T]) insertBefore(newE, at *nodeElement[T]) *nodeElement[T] {
 	if at == l.getRoot() {
-		return nil
+		newE.prev = nil
+		newE.next = nil
+		l.setRootHead(newE)
+		l.setRootTail(newE)
+	} else {
+		newE.next = at
+		newE.prev = at.prev
+		at.prev = newE
+		if newE.GetPrev() != nil {
+			newE.GetPrev().(*nodeElement[T]).next = newE
+		}
 	}
-	newE.next = at
-	newE.prev = at.prev
-	at.prev = newE
-	if newE.GetPrev() != nil {
-		newE.GetPrev().(*nodeElement[T]).next = newE
-	}
-
 	l.len.Add(1)
 	return newE
 }

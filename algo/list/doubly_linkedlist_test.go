@@ -296,3 +296,81 @@ func TestLinkedList_InsertAfterAndMove(t *testing.T) {
 		t.Logf("reverse: index: %d, addr: %p, e: %v", idx, e, e)
 	})
 }
+
+func TestLinkedList_PushBack(t *testing.T) {
+	dlist := NewLinkedList[int]()
+	element := dlist.PushBack(1)
+	assert.Equal(t, int64(1), dlist.Len())
+	assert.Equal(t, element.GetValue(), 1)
+
+	element = dlist.PushBack(2)
+	assert.Equal(t, int64(2), dlist.Len())
+	assert.Equal(t, element.GetValue(), 2)
+
+	expected := []int{1, 2}
+	dlist.ForEach(func(idx int64, e NodeElement[int]) {
+		assert.Equal(t, expected[idx], e.GetValue())
+	})
+
+	reverseExpected := []int{2, 1}
+	dlist.ReverseForEach(func(idx int64, e NodeElement[int]) {
+		assert.Equal(t, reverseExpected[idx], e.GetValue())
+	})
+}
+
+func TestLinkedList_PushFront(t *testing.T) {
+	dlist := NewLinkedList[int]()
+	element := dlist.PushFront(1)
+	assert.Equal(t, int64(1), dlist.Len())
+	assert.Equal(t, element.GetValue(), 1)
+
+	element = dlist.PushFront(2)
+	assert.Equal(t, int64(2), dlist.Len())
+	assert.Equal(t, element.GetValue(), 2)
+
+	expected := []int{2, 1}
+	dlist.ForEach(func(idx int64, e NodeElement[int]) {
+		assert.Equal(t, expected[idx], e.GetValue())
+	})
+
+	reverseExpected := []int{1, 2}
+	dlist.ReverseForEach(func(idx int64, e NodeElement[int]) {
+		assert.Equal(t, reverseExpected[idx], e.GetValue())
+	})
+}
+
+// goos: linux
+// goarch: amd64
+// pkg: github.com/benz9527/toy-box/algo/list
+// cpu: Intel(R) Core(TM) i5-4590 CPU @ 3.30GHz
+// BenchmarkDoublyLinkedList_PushBack
+// BenchmarkDoublyLinkedList_PushBack-4   	 3944040	       258.9 ns/op	      64 B/op	       1 allocs/op
+func BenchmarkDoublyLinkedList_PushBack(b *testing.B) {
+	dlist := NewLinkedList[int]()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		dlist.PushBack(i)
+	}
+	b.ReportAllocs()
+}
+
+// goos: linux
+// goarch: amd64
+// pkg: github.com/benz9527/toy-box/algo/list
+// cpu: Intel(R) Core(TM) i5-4590 CPU @ 3.30GHz
+// BenchmarkDoublyLinkedList_Append
+// BenchmarkDoublyLinkedList_Append-4   	 9450279	       127.1 ns/op	      16 B/op	       1 allocs/op
+func BenchmarkDoublyLinkedList_Append(b *testing.B) {
+	dlist := NewLinkedList[int]()
+	elements := make([]NodeElement[int], 0, b.N)
+	for i := 0; i < b.N; i++ {
+		elements = append(elements, newNodeElement[int](i, dlist))
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		dlist.Append(elements[i])
+	}
+	b.StopTimer()
+	b.ReportAllocs()
+	assert.Equal(b, int64(b.N), dlist.Len())
+}
