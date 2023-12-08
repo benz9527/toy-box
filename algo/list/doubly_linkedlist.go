@@ -264,32 +264,38 @@ func (l *doublyLinkedList[T]) Remove(targetE NodeElement[T]) NodeElement[T] {
 }
 
 func (l *doublyLinkedList[T]) ForEach(fn func(idx int64, e NodeElement[T])) {
-	if fn == nil || l.len.Load() == 0 {
+	if fn == nil || l.len.Load() == 0 ||
+		l.getRoot() == l.getRootHead() && l.getRoot() == l.getRootTail() {
 		return
 	}
 
 	var (
-		iterator       = l.getRoot()
+		iterator       = l.getRoot().GetNext()
 		idx      int64 = 0
 	)
-	for iterator.HasNext() {
-		fn(idx, iterator.GetNext())
-		iterator, idx = iterator.GetNext(), idx+1
+	for iterator != nil {
+		// Avoid remove in iteration result in memory leak
+		next := iterator.GetNext()
+		fn(idx, iterator)
+		iterator, idx = next, idx+1
 	}
 }
 
 func (l *doublyLinkedList[T]) ReverseForEach(fn func(idx int64, e NodeElement[T])) {
-	if fn == nil || l.len.Load() == 0 {
+	if fn == nil || l.len.Load() == 0 ||
+		l.getRoot() == l.getRootHead() && l.getRoot() == l.getRootTail() {
 		return
 	}
 
 	var (
-		iterator       = l.getRoot()
+		iterator       = l.getRoot().GetPrev()
 		idx      int64 = 0
 	)
-	for iterator.HasPrev() {
-		fn(idx, iterator.GetPrev())
-		iterator, idx = iterator.GetPrev(), idx+1
+	for iterator != nil {
+		// Avoid remove in iteration result in memory leak
+		prev := iterator.GetPrev()
+		fn(idx, iterator)
+		iterator, idx = prev, idx+1
 	}
 }
 
