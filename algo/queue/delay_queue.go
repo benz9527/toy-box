@@ -38,13 +38,14 @@ const (
 	fallAsleep
 )
 
-// size: 48
+// size: 56
 type arrayDQ[E comparable] struct {
-	pq       PriorityQueue[E] // alignment size: 8; size: 16
-	wakeUpC  chan struct{}    // alignment size: 8; size: 8
-	lock     *sync.RWMutex    // alignment size: 8; size: 8
-	mu       *sync.Mutex      // alignment size: 8; size: 8
-	sleeping int32            // alignment size: 4; size: 4
+	pq               PriorityQueue[E] // alignment size: 8; size: 16
+	wakeUpC          chan struct{}    // alignment size: 8; size: 8
+	waitNextExpiredC chan struct{}    // alignment size: 8; size: 8
+	lock             *sync.RWMutex    // alignment size: 8; size: 8
+	mu               *sync.Mutex      // alignment size: 8; size: 8
+	sleeping         int32            // alignment size: 4; size: 4
 }
 
 func NewArrayDelayQueue[E comparable](
@@ -62,10 +63,11 @@ func NewArrayDelayQueue[E comparable](
 		}
 	}
 	return &arrayDQ[E]{
-		wakeUpC: make(chan struct{}, 1),
-		pq:      NewArrayPriorityQueue[E](capacity, comparator[0]),
-		mu:      &sync.Mutex{},
-		lock:    &sync.RWMutex{},
+		wakeUpC:          make(chan struct{}, 1),
+		waitNextExpiredC: make(chan struct{}, 1),
+		pq:               NewArrayPriorityQueue[E](capacity, comparator[0]),
+		mu:               &sync.Mutex{},
+		lock:             &sync.RWMutex{},
 	}
 }
 
@@ -101,6 +103,7 @@ func (dq *arrayDQ[E]) Offer(item E, expiration int64) error {
 
 func (dq *arrayDQ[E]) poll(ctx context.Context, nowFn func() int64, sender chan<- E, closeChAfterFinish bool) {
 	dq.mu.Lock() // Avoid concurrent execution of Poll()
+	var timer *time.Timer
 	defer func() {
 		// FIXME recover defer execution order
 		if err := recover(); err != nil {
@@ -112,6 +115,10 @@ func (dq *arrayDQ[E]) poll(ctx context.Context, nowFn func() int64, sender chan<
 			close(sender)
 		}
 		dq.mu.Unlock()
+		if timer != nil {
+			timer.Stop()
+			timer = nil
+		}
 	}()
 	for {
 		now := nowFn()
@@ -124,6 +131,18 @@ func (dq *arrayDQ[E]) poll(ctx context.Context, nowFn func() int64, sender chan<
 			atomic.StoreInt32(&dq.sleeping, fallAsleep)
 		}
 		dq.lock.RUnlock()
+		if item == nil && deltaMs > 0 {
+			if timer != nil {
+				timer.Stop()
+			}
+			// Avoid to use time.After(), it will create a new timer every time
+			// what's worse the underlay timer will not be GC.
+			timer = time.AfterFunc(time.Duration(deltaMs)*time.Millisecond, func() {
+				if atomic.SwapInt32(&dq.sleeping, wakeUp) == fallAsleep {
+					dq.waitNextExpiredC <- struct{}{}
+				}
+			})
+		}
 
 		if item == nil {
 			if deltaMs == 0 {
@@ -141,10 +160,11 @@ func (dq *arrayDQ[E]) poll(ctx context.Context, nowFn func() int64, sender chan<
 					return
 				case <-dq.wakeUpC:
 					continue
-				case <-time.After(time.Duration(deltaMs) * time.Millisecond):
+				case <-dq.waitNextExpiredC:
 					// Waiting for this item to be expired
-					if atomic.SwapInt32(&dq.sleeping, wakeUp) == fallAsleep {
-						dq.wakeUpC <- struct{}{}
+					if timer != nil {
+						timer.Stop()
+						timer = nil
 					}
 					continue
 				}
