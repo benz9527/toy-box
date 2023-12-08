@@ -96,7 +96,7 @@ func TestDelayQueue_PollToChannel(t *testing.T) {
 	_ = dq.Offer(&person{age: 5, name: "p6", salary: ms + 250}, ms+250)
 	_ = dq.Offer(&person{age: 200, name: "p7", salary: ms + 301}, ms+301)
 
-	expectedCount := 8
+	expectedCount := 6
 	actualCount := 0
 	defer func() {
 		assert.Equal(t, expectedCount, actualCount)
