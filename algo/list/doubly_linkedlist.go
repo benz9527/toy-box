@@ -161,11 +161,15 @@ func (l *doublyLinkedList[T]) AppendValue(values ...T) []NodeElement[T] {
 func (l *doublyLinkedList[T]) insertAfter(newE, at *nodeElement[T]) *nodeElement[T] {
 	if at == l.getRoot() {
 		newE.prev = nil
+	} else {
+		newE.prev = at
+	}
+
+	if l.len.Load() == 0 {
 		newE.next = nil
 		l.setRootHead(newE)
 		l.setRootTail(newE)
 	} else {
-		newE.prev = at
 		newE.next = at.GetNext()
 		at.next = newE
 		if newE.GetNext() != nil {
@@ -195,12 +199,15 @@ func (l *doublyLinkedList[T]) InsertAfter(v T, dstE NodeElement[T]) NodeElement[
 
 func (l *doublyLinkedList[T]) insertBefore(newE, at *nodeElement[T]) *nodeElement[T] {
 	if at == l.getRoot() {
-		newE.prev = nil
 		newE.next = nil
+	} else {
+		newE.next = at
+	}
+	if l.len.Load() == 0 {
+		newE.prev = nil
 		l.setRootHead(newE)
 		l.setRootTail(newE)
 	} else {
-		newE.next = at
 		newE.prev = at.prev
 		at.prev = newE
 		if newE.GetPrev() != nil {
@@ -323,16 +330,10 @@ func (l *doublyLinkedList[T]) FindFirst(targetV T, compareFn ...func(e NodeEleme
 }
 
 func (l *doublyLinkedList[T]) Front() NodeElement[T] {
-	if l.len.Load() == 0 {
-		return nil
-	}
 	return l.root.GetNext()
 }
 
 func (l *doublyLinkedList[T]) Back() NodeElement[T] {
-	if l.len.Load() == 0 {
-		return nil
-	}
 	return l.root.GetPrev()
 }
 

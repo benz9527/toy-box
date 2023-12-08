@@ -374,3 +374,16 @@ func BenchmarkDoublyLinkedList_Append(b *testing.B) {
 	b.ReportAllocs()
 	assert.Equal(b, int64(b.N), dlist.Len())
 }
+
+func TestDoublyLinkedList_InsertBefore2(t *testing.T) {
+	dlist := NewLinkedList[int]()
+	_2n := dlist.InsertBefore(2, dlist.Front())
+	assert.Equal(t, int64(1), dlist.Len())
+	assert.Equal(t, _2n.GetValue(), 2)
+	dlist.ForEach(func(idx int64, e NodeElement[int]) {
+		t.Logf("index: %d, addr: %p, e: %v", idx, e, e)
+	})
+	dlist.ReverseForEach(func(idx int64, e NodeElement[int]) {
+		t.Logf("reverse: index: %d, addr: %p, e: %v", idx, e, e)
+	})
+}
