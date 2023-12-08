@@ -3,39 +3,47 @@ package timer
 import (
 	"context"
 	"github.com/benz9527/toy-box/algo/list"
-	"reflect"
+	"sync"
 	"sync/atomic"
-	"time"
-	"unsafe"
 )
+
+type elementTasker interface {
+	getAndReleaseElementRef() list.NodeElement[Task]
+}
 
 type task struct {
 	jobID        JobID
 	job          Job
 	expirationMs int64
-	// TimingWheelSlot atomic store and load is safe for concurrent access.
-	slot unsafe.Pointer
+	slot         TimingWheelSlot
 	// Doubly pointer reference, it is easy for us to access the element in the list.
 	elementRef list.NodeElement[Task]
 
 	loopCount int64
 	cancelled atomic.Bool
+	taskType  TaskType
+	lock      *sync.RWMutex
+}
+
+var (
+	_ Task          = (*task)(nil)
+	_ elementTasker = (*task)(nil)
+)
+
+func (t *task) getAndReleaseElementRef() list.NodeElement[Task] {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	ref := t.elementRef
+	t.elementRef = nil
+	return ref
 }
 
 func (t *task) GetJobID() JobID {
 	return t.jobID
 }
 
-func (t *task) GetLoopCount() int64 {
+func (t *task) GetRestLoopCount() int64 {
 	return atomic.LoadInt64(&t.loopCount)
-}
-
-func (t *task) IncreaseLoopCount() int64 {
-	return atomic.SwapInt64(&t.loopCount, t.GetLoopCount()+1)
-}
-
-func (t *task) DecreaseLoopCount() int64 {
-	return atomic.SwapInt64(&t.loopCount, t.GetLoopCount()-1)
 }
 
 func (t *task) GetJob() Job {
@@ -46,29 +54,39 @@ func (t *task) Cancelled() bool {
 	return t.cancelled.Load()
 }
 
-func (t *task) GetDelayMs() int64 {
-	return 0
-}
-
 func (t *task) GetExpirationMs() int64 {
 	return atomic.LoadInt64(&t.expirationMs)
 }
 
-func (t *task) SetExpirationMs(expirationMs int64) {
-	t.expirationMs = expirationMs
-}
-
 func (t *task) GetSlot() TimingWheelSlot {
-	ptr := (*any)(atomic.LoadPointer(&t.slot))
-	return (*ptr).(TimingWheelSlot)
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+	return t.slot
 }
 
-func (t *task) SetSlot(slot TimingWheelSlot) {
-	v := reflect.ValueOf(slot)
-	if v.Kind() == reflect.Ptr {
-		v = v.Elem()
+func (t *task) setSlot(slot TimingWheelSlot) {
+	if slot == nil {
+		return
 	}
-	atomic.StorePointer(&t.slot, v.UnsafePointer())
+	t.lock.Lock()
+	t.slot = slot
+	t.lock.Unlock()
+}
+
+func (t *task) getElementRef() list.NodeElement[Task] {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+	return t.elementRef
+}
+
+func (t *task) setElementRef(elementRef list.NodeElement[Task]) {
+	t.lock.Lock()
+	t.elementRef = elementRef
+	t.lock.Unlock()
+}
+
+func (t *task) GetTaskType() TaskType {
+	return t.taskType
 }
 
 func (t *task) Cancel() bool {
@@ -81,29 +99,70 @@ func (t *task) Cancel() bool {
 		//  But at the same time, the t is expired and reinserted to the next slot,
 		//  which handled by slot.Flush() in other goroutine.
 		stopped = slot.RemoveTask(t)
-		if old := t.cancelled.Swap(true); old {
+		if t.cancelled.Swap(true) {
+			// Previous value is true, it means that the task has been cancelled.
 			stopped = true
 			break
 		}
+	}
+	if stopped && t.taskType == OnceTask {
+		atomic.SwapInt64(&t.loopCount, 0)
+	} else if stopped && t.taskType == RepeatTask {
+		atomic.SwapInt64(&t.loopCount, t.GetRestLoopCount()-1)
 	}
 	return stopped
 }
 
 type xTask struct {
-	task
+	*task
 	ctx context.Context
 }
 
+func (t *xTask) getAndReleaseElementRef() list.NodeElement[Task] {
+	return t.task.getAndReleaseElementRef()
+}
+
+func (t *xTask) Cancel() bool {
+	return t.task.Cancel()
+}
+
+type xScheduledTask struct {
+	*xTask
+	beginMs   int64
+	scheduler Scheduler
+}
+
+func (t *xScheduledTask) UpdateNextScheduledMs() {
+	expiredMs := t.scheduler.next(t.beginMs)
+	atomic.StoreInt64(&t.expirationMs, expiredMs)
+	if expiredMs == -1 {
+		return
+	}
+	t.beginMs = expiredMs
+}
+
+func (t *xScheduledTask) GetRestLoopCount() int64 {
+	return t.scheduler.GetRestLoopCount()
+}
+
+func (t *xScheduledTask) getAndReleaseElementRef() list.NodeElement[Task] {
+	return t.elementRef
+}
+
+func (t *xScheduledTask) Cancel() bool {
+	return t.task.Cancel()
+}
+
 var (
-	_ Task = (*task)(nil)
-	_ Task = (*xTask)(nil)
+	_ Task          = (*task)(nil)
+	_ Task          = (*xTask)(nil)
+	_ ScheduledTask = (*xScheduledTask)(nil)
 )
 
-func NewXTask(
+func NewOnceTask(
 	ctx context.Context,
 	jobID JobID,
-	expiredMs time.Duration,
-	loopCount int64,
+	expiredMs int64,
 	job Job,
 ) Task {
 	if ctx == nil {
@@ -111,13 +170,40 @@ func NewXTask(
 	}
 
 	t := &xTask{
-		task: task{
+		task: &task{
 			jobID:        jobID,
-			expirationMs: expiredMs.Milliseconds(),
-			loopCount:    loopCount,
+			expirationMs: expiredMs,
+			loopCount:    1,
 			job:          job,
+			lock:         &sync.RWMutex{},
 		},
 		ctx: ctx,
 	}
+	return t
+}
+
+func NewRepeatTask(
+	ctx context.Context,
+	jobID JobID,
+	beginMs int64,
+	scheduler Scheduler,
+	job Job,
+) ScheduledTask {
+	if ctx == nil || scheduler == nil || job == nil {
+		return nil
+	}
+	t := &xScheduledTask{
+		xTask: &xTask{
+			task: &task{
+				jobID: jobID,
+				job:   job,
+				lock:  &sync.RWMutex{},
+			},
+			ctx: ctx,
+		},
+		scheduler: scheduler,
+		beginMs:   beginMs,
+	}
+	t.UpdateNextScheduledMs()
 	return t
 }

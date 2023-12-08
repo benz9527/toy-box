@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/benz9527/toy-box/algo/queue"
 	"log/slog"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,12 +15,13 @@ import (
 type timingWheel struct {
 	ctx context.Context
 
-	tickMs        int64
-	startMs       int64 // baseline startup timestamp
-	interval      int64
-	currentTimeMs int64
-	slotSize      int64 // in kafka it is wheelSize
-	taskCounter   *atomic.Int64
+	tickMs               int64
+	startMs              int64 // baseline startup timestamp
+	interval             int64
+	currentTimeMs        int64
+	slotSize             int64 // in kafka it is wheelSize
+	globalTaskCounterRef *atomic.Int64
+	globalSlotCounterRef *atomic.Int64
 
 	lock *sync.RWMutex
 
@@ -28,6 +30,10 @@ type timingWheel struct {
 	slots       []TimingWheelSlot // in kafka it is buckets
 	globalDqRef queue.DelayQueue[TimingWheelSlot]
 }
+
+var (
+	_ TimingWheel = (*timingWheel)(nil)
+)
 
 type TimingWheelOptions func(tw *timingWheel)
 
@@ -49,24 +55,27 @@ func newTimingWheel(
 	slotSize int64,
 	startMs int64,
 	taskCounter *atomic.Int64,
+	slotCounter *atomic.Int64,
 	dq queue.DelayQueue[TimingWheelSlot],
 ) TimingWheel {
 	tw := &timingWheel{
-		ctx:           ctx,
-		lock:          &sync.RWMutex{},
-		tickMs:        tickMs,
-		startMs:       startMs,
-		slotSize:      slotSize,
-		taskCounter:   taskCounter,
-		interval:      tickMs * slotSize,
-		currentTimeMs: truncateMs(startMs, tickMs),
-		slots:         make([]TimingWheelSlot, slotSize),
-		globalDqRef:   dq,
+		ctx:                  ctx,
+		lock:                 &sync.RWMutex{},
+		tickMs:               tickMs,
+		startMs:              startMs,
+		slotSize:             slotSize,
+		globalTaskCounterRef: taskCounter,
+		globalSlotCounterRef: slotCounter,
+		interval:             tickMs * slotSize,
+		currentTimeMs:        startMs - (startMs % tickMs),
+		slots:                make([]TimingWheelSlot, slotSize),
+		globalDqRef:          dq,
 	}
 	// Slot initialize by doubly linked list.
 	for i := int64(0); i < slotSize; i++ {
 		tw.slots[i] = NewXSlot()
 	}
+	tw.globalSlotCounterRef.Add(slotSize)
 	return tw
 }
 
@@ -79,7 +88,7 @@ func (tw *timingWheel) GetStartMs() int64 {
 }
 
 func (tw *timingWheel) GetTaskCounter() int64 {
-	return tw.taskCounter.Load()
+	return tw.globalTaskCounterRef.Load()
 }
 
 func (tw *timingWheel) GetCurrentTimeMs() int64 {
@@ -94,18 +103,20 @@ func (tw *timingWheel) GetSlotSize() int64 {
 	return atomic.LoadInt64(&tw.slotSize)
 }
 
-func (tw *timingWheel) advanceClock(timeoutMs int64) {
+func (tw *timingWheel) advanceClock(slotExpiredMs int64) {
+	// Here related to slot level upgrade and downgrade.
 	currentTimeMs := tw.GetCurrentTimeMs()
 	tickMs := tw.GetTickMs()
-	if timeoutMs >= currentTimeMs+tickMs {
-		currentTimeMs = truncateMs(timeoutMs, tickMs)
+	if slotExpiredMs >= currentTimeMs+tickMs {
+		currentTimeMs = slotExpiredMs - (slotExpiredMs % tickMs)
+		atomic.StoreInt64(&tw.currentTimeMs, currentTimeMs)
 		if tw.overflowWheelRef != nil {
 			tw.overflowWheelRef.(*timingWheel).advanceClock(currentTimeMs)
 		}
 	}
 }
 
-func (tw *timingWheel) addTask(task Task) error {
+func (tw *timingWheel) addTask(task Task, level int64) error {
 	if len(task.GetJobID()) <= 0 {
 		return ErrTimingWheelTaskEmptyJobID
 	}
@@ -113,47 +124,55 @@ func (tw *timingWheel) addTask(task Task) error {
 		return ErrTimingWheelEmptyJob
 	}
 
-	tw.lock.Lock()
-	defer tw.lock.Unlock()
-
-	taskExpiration := task.GetExpirationMs()
+	taskExpiredMs := task.GetExpirationMs()
 	currentTimeMs := tw.GetCurrentTimeMs()
 	tickMs := tw.GetTickMs()
 	interval := tw.GetInterval()
 	slotSize := tw.GetSlotSize()
 
-	switch {
-	case task.Cancelled():
+	if task.Cancelled() {
 		return errors.New("[timing wheel] task is cancelled")
-	case taskExpiration < currentTimeMs+tickMs:
-		return fmt.Errorf("[timing wheel] task taskExpiration at %d is before %d %w",
-			taskExpiration, currentTimeMs+tickMs, ErrTimingWheelTaskIsExpired)
-	case taskExpiration < currentTimeMs+interval:
-		virtualID := taskExpiration / tickMs
+	} else if taskExpiredMs < currentTimeMs+tickMs {
+		task.setSlot(immediateExpiredSlot)
+		tw.globalSlotCounterRef.Add(1)
+		return fmt.Errorf("[timing wheel] task taskExpiredMs at %d is before %d %w",
+			taskExpiredMs, currentTimeMs+tickMs, ErrTimingWheelTaskIsExpired)
+	} else if taskExpiredMs < currentTimeMs+interval {
+		virtualID := taskExpiredMs / tickMs
 		slotID := int(virtualID % slotSize)
 		slot := tw.slots[slotID]
-		if !slot.SetExpirationMs(virtualID * tickMs) {
+		if !slot.setExpirationMs(virtualID * tickMs) {
 			return fmt.Errorf("[timing wheel] slot %d unable update the expiration %w",
 				virtualID*tickMs, ErrTimingWheelTaskUnableToBeAddedToSlot)
 		}
+
+		tw.lock.Lock()
 		slot.AddTask(task)
-		_ = tw.globalDqRef.Offer(slot, slot.GetExpirationMs())
-		tw.taskCounter.Add(1)
+		slot.setSlotID(int64(slotID))
+		slot.setLevel(level)
+		if err := tw.globalDqRef.Offer(slot, slot.GetExpirationMs()); err != nil {
+			slog.Error("[timing wheel] offer slot to delay queue error", "error", err)
+		}
+		tw.lock.Unlock()
+		tw.globalTaskCounterRef.Add(1)
 		return nil
-	default:
+	} else {
 		// Out of the interval. Put it into the higher interval timing wheel
 		if tw.overflowWheelRef == nil {
+			tw.lock.Lock()
 			tw.overflowWheelRef = newTimingWheel(
 				tw.ctx,
 				interval,
 				slotSize,
 				currentTimeMs,
-				tw.taskCounter,
+				tw.globalTaskCounterRef,
+				tw.globalSlotCounterRef,
 				tw.globalDqRef,
 			)
+			tw.lock.Unlock()
 		}
 		// Tail recursive call, it will be free the previous stack frame.
-		return tw.overflowWheelRef.(*timingWheel).addTask(task)
+		return tw.overflowWheelRef.(*timingWheel).addTask(task, level+1)
 	}
 }
 
@@ -165,13 +184,18 @@ type xTimingWheels struct {
 	addTaskC     chan Task
 	expiredSlotC chan TimingWheelSlot
 	taskCounter  *atomic.Int64
+	slotCounter  *atomic.Int64
 	cancelTaskC  chan JobID
-	lock         sync.RWMutex
+	lock         *sync.RWMutex
 	isRunning    atomic.Bool
 
 	dq       queue.DelayQueue[TimingWheelSlot] // Do not use the timer.Ticker
 	tasksMap map[JobID]Task
 }
+
+var (
+	_ TimingWheels = (*xTimingWheels)(nil)
+)
 
 // NewTimingWheels creates a new timing wheel.
 // @param startMs the start time in milliseconds, example value time.Now().UnixMilli().
@@ -185,10 +209,13 @@ func NewTimingWheels(ctx context.Context, startMs int64, opts ...TimingWheelOpti
 	xtw := &xTimingWheels{
 		ctx:          ctx,
 		taskCounter:  &atomic.Int64{},
+		slotCounter:  &atomic.Int64{},
 		addTaskC:     make(chan Task),
 		stopC:        make(chan struct{}),
-		expiredSlotC: make(chan TimingWheelSlot),
+		expiredSlotC: make(chan TimingWheelSlot, 3),
 		cancelTaskC:  make(chan JobID),
+		tasksMap:     make(map[JobID]Task),
+		lock:         &sync.RWMutex{},
 	}
 	xtw.isRunning.Store(false)
 	tw := &timingWheel{
@@ -200,9 +227,9 @@ func NewTimingWheels(ctx context.Context, startMs int64, opts ...TimingWheelOpti
 		}
 	}
 
-	if tw.taskCounter == nil {
-		tw.taskCounter = &atomic.Int64{}
-		tw.taskCounter.Store(0)
+	if tw.globalTaskCounterRef == nil {
+		tw.globalTaskCounterRef = &atomic.Int64{}
+		tw.globalTaskCounterRef.Store(0)
 	}
 	if tw.tickMs <= 0 {
 		tw.tickMs = time.Millisecond.Milliseconds()
@@ -217,9 +244,10 @@ func NewTimingWheels(ctx context.Context, startMs int64, opts ...TimingWheelOpti
 		tw.slotSize,
 		tw.startMs,
 		xtw.taskCounter,
+		xtw.slotCounter,
 		xtw.dq,
 	)
-	xtw.startAndRun(ctx)
+	xtw.schedule(ctx)
 	return xtw
 }
 
@@ -229,8 +257,10 @@ func (xtw *xTimingWheels) Shutdown() {
 		return
 	}
 	xtw.dq = nil
-	xtw.tasksMap = nil
 	xtw.isRunning.Store(false)
+	oldMap := xtw.tasksMap
+	clear(oldMap)
+	xtw.tasksMap = make(map[JobID]Task)
 	close(xtw.stopC)
 	close(xtw.addTaskC)
 	close(xtw.expiredSlotC)
@@ -250,21 +280,74 @@ func (xtw *xTimingWheels) GetTaskCounter() int64 {
 }
 
 func (xtw *xTimingWheels) GetSlotSize() int64 {
-	return xtw.tw.GetSlotSize()
+	return xtw.slotCounter.Load()
 }
 
 func (xtw *xTimingWheels) AddTask(task Task) error {
+	if xtw.isRunning.Load() == false {
+		return ErrTimingWheelStopped
+	}
 	if len(task.GetJobID()) <= 0 {
 		return ErrTimingWheelTaskEmptyJobID
 	}
 	if task.GetJob() == nil {
 		return ErrTimingWheelEmptyJob
 	}
+	if xtw.isRunning.Load() == false {
+		return ErrTimingWheelStopped
+	}
 	xtw.addTaskC <- task
 	return nil
 }
 
+func (xtw *xTimingWheels) AfterFunc(delayMs time.Duration, fn func()) (Task, error) {
+	if delayMs.Milliseconds() < xtw.GetTickMs() {
+		return nil, fmt.Errorf("[timing wheel] delay ms %d is less than tick ms %d %w",
+			delayMs.Milliseconds(), xtw.GetTickMs(), ErrTimingWheelTaskTooShortExpiration)
+	}
+	if fn == nil {
+		return nil, ErrTimingWheelEmptyJob
+	}
+	now := time.Now().UTC()
+	task := NewOnceTask(
+		xtw.ctx,
+		JobID(fmt.Sprintf("%d", now.UnixNano())), // FIXME UUID
+		now.Add(delayMs).UnixMilli(),
+		func(ctx context.Context, jobID JobID) {
+			fn()
+		})
+
+	if err := xtw.AddTask(task); err != nil {
+		return nil, err
+	}
+	return task, nil
+}
+
+func (xtw *xTimingWheels) ScheduleFunc(sched Scheduler, fn func()) (Task, error) {
+	if sched == nil {
+		return nil, ErrTimingWheelUnknownScheduler
+	}
+	if fn == nil {
+		return nil, ErrTimingWheelEmptyJob
+	}
+	now := time.Now()
+	task := NewRepeatTask(
+		xtw.ctx,
+		JobID(fmt.Sprintf("%d", now.UnixNano())), // FIXME UUID
+		now.UnixMilli(), sched,
+		func(ctx context.Context, jobID JobID) {
+			fn()
+		})
+	if err := xtw.AddTask(task); err != nil {
+		return nil, err
+	}
+	return task, nil
+}
+
 func (xtw *xTimingWheels) CancelTask(jobID JobID) error {
+	if xtw.isRunning.Load() == false {
+		return ErrTimingWheelStopped
+	}
 	if len(jobID) <= 0 {
 		return ErrTimingWheelTaskEmptyJobID
 	}
@@ -279,19 +362,49 @@ func (xtw *xTimingWheels) CancelTask(jobID JobID) error {
 	return nil
 }
 
-func (xtw *xTimingWheels) startAndRun(ctx context.Context) {
+const (
+	disableTimingWheelsSchedulePoll        = "disableTWSPoll"
+	disableTimingWheelsScheduleCancelTask  = "disableTWSCancelTask"
+	disableTimingWheelsScheduleExpiredSlot = "disableTWSExpSlot"
+)
+
+func (xtw *xTimingWheels) schedule(ctx context.Context) {
 	if ctx == nil {
 		return
 	}
 	go func() {
-		_ = xtw.dq.PollToChannel(xtw.ctx, func() int64 {
-			return time.Now().UTC().UnixMilli()
-		}, xtw.expiredSlotC)
-	}()
-	go func() {
 		defer func() {
 			if err := recover(); err != nil {
-				slog.Error("[timing wheel] scheduler panic recover", "error", err)
+				slog.Error("[timing wheel] add task schedule panic recover", "error", err, "stack", debug.Stack())
+			}
+		}()
+		for {
+			select {
+			case <-ctx.Done():
+				xtw.Shutdown()
+				return
+			case <-xtw.stopC:
+				return
+			case task, ok := <-xtw.addTaskC:
+				if !ok {
+					slog.Warn("[timing wheel] add task channel is closed")
+					continue
+				}
+				err := xtw.addTask(task)
+				if errors.Is(err, ErrTimingWheelTaskIsExpired) {
+					slog.Info("[timing wheel] task is expired immediately", "jobID", task.GetJobID())
+					xtw.addOrRunTask(task)
+				}
+			}
+		}
+	}()
+	go func(disabled any) {
+		if disabled != nil && disabled.(bool) {
+			return
+		}
+		defer func() {
+			if err := recover(); err != nil {
+				slog.Error("[timing wheel] expired slot schedule panic recover", "error", err, "stack", debug.Stack())
 			}
 		}()
 		for {
@@ -303,20 +416,32 @@ func (xtw *xTimingWheels) startAndRun(ctx context.Context) {
 				return
 			case slot, ok := <-xtw.expiredSlotC:
 				if !ok {
-					slog.Warn("[timing wheel] expired slot channel is closed")
 					continue
 				}
+				xtw.lock.Lock()
 				xtw.advanceClock(slot.GetExpirationMs())
+				xtw.lock.Unlock()
+				// Here related to slot level upgrade and downgrade.
 				slot.Flush(xtw.addOrRunTask)
-			case task, ok := <-xtw.addTaskC:
-				if !ok {
-					slog.Warn("[timing wheel] add task channel is closed")
-					continue
-				}
-				err := xtw.addTask(task)
-				if errors.Is(err, ErrTimingWheelTaskIsExpired) {
-					// Run task immediately
-				}
+			}
+		}
+	}(ctx.Value(disableTimingWheelsScheduleExpiredSlot))
+	go func(disabled any) {
+		if disabled != nil && disabled.(bool) {
+			return
+		}
+		defer func() {
+			if err := recover(); err != nil {
+				slog.Error("[timing wheel] cancel task schedule panic recover", "error", err, "stack", debug.Stack())
+			}
+		}()
+		for {
+			select {
+			case <-ctx.Done():
+				xtw.Shutdown()
+				return
+			case <-xtw.stopC:
+				return
 			case jobID, ok := <-xtw.cancelTaskC:
 				if !ok {
 					slog.Warn("[timing wheel] cancel task channel is closed")
@@ -325,20 +450,34 @@ func (xtw *xTimingWheels) startAndRun(ctx context.Context) {
 				xtw.cancelTask(jobID)
 			}
 		}
-	}()
+	}(ctx.Value(disableTimingWheelsScheduleCancelTask))
+	go func(disabled any) {
+		if disabled != nil && disabled.(bool) {
+			return
+		}
+		err := xtw.dq.PollToChannel(xtw.ctx, func() int64 {
+			return time.Now().UTC().UnixMilli()
+		}, xtw.expiredSlotC)
+		if err != nil {
+			slog.Error("[timing wheel] delay queue poll error", "error", err)
+		}
+		slog.Warn("[timing wheel] delay queue exit")
+	}(ctx.Value(disableTimingWheelsSchedulePoll))
 	xtw.isRunning.Store(true)
 }
 
 func (xtw *xTimingWheels) advanceClock(timeoutMs int64) {
+	// Here related to slot level upgrade and downgrade.
 	xtw.tw.(*timingWheel).advanceClock(timeoutMs)
 }
 
 func (xtw *xTimingWheels) addTask(task Task) error {
 	// FIXME Recursive function to add a task, need to measure the performance.
-	err := xtw.tw.(*timingWheel).addTask(task)
-	if err == nil {
-		// FIXME thread safe?
+	err := xtw.tw.(*timingWheel).addTask(task, 0)
+	if err == nil || errors.Is(err, ErrTimingWheelTaskIsExpired) {
+		xtw.lock.Lock()
 		xtw.tasksMap[task.GetJobID()] = task
+		xtw.lock.Unlock()
 	}
 	return err
 }
@@ -347,42 +486,72 @@ func (xtw *xTimingWheels) addOrRunTask(task Task) {
 	if task == nil || task.Cancelled() {
 		return
 	}
-	// FIXME goroutine pool to run this.
-	go task.GetJob()(context.TODO(), task.GetJobID())
 
-	xtw.lock.Lock()
-	defer xtw.lock.Unlock()
+	// FIXME goroutine pool to run this.
+	// [slotExpMs, slotExpMs+interval)
+	taskLevel := task.GetSlot().GetLevel()
+	runNow := task.GetSlot().GetExpirationMs() == sentinelSlotExpiredMs || taskLevel == 0
+	if runNow {
+		go task.GetJob()(xtw.ctx, task.GetJobID())
+	}
 
 	// Re-add loop job to timing wheel.
-	if task.GetLoopCount() >= 1 {
-		// FIXME Re-add error handle
-		_ = xtw.AddTask(task)
-		task.DecreaseLoopCount()
-	} else if task.GetLoopCount() <= -1 {
-		_ = xtw.AddTask(task)
+	// Upgrade and downgrade (move) the task from one slot to another slot.
+	switch task.GetTaskType() {
+	case OnceTask:
+		// FIXME lock race
+		if taskLevel == 0 && runNow {
+			xtw.cancelTask(task.GetJobID())
+		} else if taskLevel > 0 && !runNow {
+			xtw.taskCounter.Add(-1)
+			// Lock free
+			xtw.addTaskC <- task
+		}
+	case RepeatTask:
+		var sTask Task
+		if taskLevel == 0 && runNow {
+			if task.GetRestLoopCount() == 0 {
+				xtw.cancelTask(task.GetJobID())
+				return
+			}
+			sTask, ok := task.(ScheduledTask)
+			if !ok {
+				return
+			}
+			sTask.UpdateNextScheduledMs()
+			if sTask.GetExpirationMs() < 0 {
+				return
+			}
+		} else if taskLevel > 0 && !runNow {
+			sTask = task
+		}
+		// Lock free
+		if sTask != nil {
+			xtw.taskCounter.Add(-1)
+			xtw.addTaskC <- sTask
+		}
 	}
 }
 
 func (xtw *xTimingWheels) cancelTask(jobID JobID) {
+	if xtw.isRunning.Load() == false {
+		return
+	}
+
+	xtw.lock.RLock()
 	task, ok := xtw.tasksMap[jobID]
+	xtw.lock.RUnlock()
 	if !ok {
 		return
 	}
 
-	xtw.lock.Lock()
-	defer xtw.lock.Unlock()
-
-	if !task.GetSlot().RemoveTask(task) {
+	if task.GetSlot() != nil && !task.GetSlot().RemoveTask(task) {
 		return
 	}
 	task.Cancel()
-	delete(xtw.tasksMap, jobID)
-	xtw.taskCounter.Add(-1)
-}
 
-func truncateMs(srcMs, baseMs int64) int64 {
-	if baseMs <= 0 {
-		return srcMs
-	}
-	return srcMs - (srcMs % baseMs)
+	xtw.lock.Lock()
+	delete(xtw.tasksMap, jobID)
+	xtw.lock.Unlock()
+	xtw.taskCounter.Add(-1)
 }
