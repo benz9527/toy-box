@@ -34,8 +34,8 @@ func (d *dqItem[E]) GetExpiration() int64 {
 type sleepEnum = int32
 
 const (
-	goToSleep sleepEnum = iota
-	wakeUpToWork
+	wakeUp sleepEnum = iota
+	fallAsleep
 )
 
 // size: 48
@@ -62,7 +62,7 @@ func NewArrayDelayQueue[E comparable](
 		}
 	}
 	return &arrayDQ[E]{
-		wakeUpC: make(chan struct{}),
+		wakeUpC: make(chan struct{}, 1),
 		pq:      NewArrayPriorityQueue[E](capacity, comparator[0]),
 		mu:      &sync.Mutex{},
 		lock:    &sync.RWMutex{},
@@ -92,7 +92,7 @@ func (dq *arrayDQ[E]) Offer(item E, expiration int64) error {
 
 	if e.GetPQItem().GetIndex() == 0 {
 		// Highest priority item, wake up the consumer
-		if atomic.CompareAndSwapInt32(&dq.sleeping, 1, 0) {
+		if atomic.CompareAndSwapInt32(&dq.sleeping, fallAsleep, wakeUp) {
 			dq.wakeUpC <- struct{}{}
 		}
 	}
@@ -107,7 +107,7 @@ func (dq *arrayDQ[E]) poll(ctx context.Context, nowFn func() int64, sender chan<
 			slog.Error("delay queue panic recover", "error", err)
 		}
 		// before exit
-		atomic.StoreInt32(&dq.sleeping, wakeUpToWork)
+		atomic.StoreInt32(&dq.sleeping, wakeUp)
 		if closeChAfterFinish && sender != nil {
 			close(sender)
 		}
@@ -121,7 +121,7 @@ func (dq *arrayDQ[E]) poll(ctx context.Context, nowFn func() int64, sender chan<
 			// No expired item in the queue
 			// 1. without any item in the queue
 			// 2. all items in the queue are not expired
-			atomic.StoreInt32(&dq.sleeping, goToSleep)
+			atomic.StoreInt32(&dq.sleeping, fallAsleep)
 		}
 		dq.lock.RUnlock()
 
@@ -143,9 +143,8 @@ func (dq *arrayDQ[E]) poll(ctx context.Context, nowFn func() int64, sender chan<
 					continue
 				case <-time.After(time.Duration(deltaMs) * time.Millisecond):
 					// Waiting for this item to be expired
-					if atomic.SwapInt32(&dq.sleeping, wakeUpToWork) == wakeUpToWork {
-						// block the Offer() method
-						<-dq.wakeUpC
+					if atomic.SwapInt32(&dq.sleeping, wakeUp) == fallAsleep {
+						dq.wakeUpC <- struct{}{}
 					}
 					continue
 				}
@@ -176,6 +175,6 @@ func (dq *arrayDQ[E]) PollToChannel(ctx context.Context, nowFn func() int64, C c
 	if ctx == nil {
 		return errEmptyContext
 	}
-	go dq.poll(ctx, nowFn, C, false)
+	dq.poll(ctx, nowFn, C, false)
 	return nil
 }
