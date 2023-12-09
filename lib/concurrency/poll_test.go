@@ -2,7 +2,7 @@ package concurrency_test
 
 import (
 	"fmt"
-	"github.com/benz9527/toy-box/toys/pkg/concurrency"
+	"github.com/benz9527/toy-box/lib/concurrency"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/types"
 	"github.com/onsi/gomega"

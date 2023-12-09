@@ -3,12 +3,12 @@
 package concurrency_test
 
 import (
+	. "github.com/benz9527/toy-box/lib/concurrency"
 	"math/rand"
 	"runtime"
 	"testing"
 	"time"
 
-	. "github.com/benz9527/toy-box/toys/pkg/concurrency"
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/types"
 	. "github.com/onsi/gomega"

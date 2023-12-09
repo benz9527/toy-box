@@ -5,12 +5,12 @@ package concurrency_test
 import (
 	"context"
 	"errors"
-	"github.com/benz9527/toy-box/toys/pkg/runtime"
+	"github.com/benz9527/toy-box/lib/concurrency"
+	"github.com/benz9527/toy-box/lib/runtime"
+	"github.com/onsi/ginkgo/v2"
 	"testing"
 	"time"
 
-	"github.com/benz9527/toy-box/toys/pkg/concurrency"
-	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/types"
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
