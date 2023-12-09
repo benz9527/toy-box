@@ -171,6 +171,12 @@ func (dq *arrayDQ[E]) poll(ctx context.Context, nowFn func() int64, sender chan<
 			}
 		}
 
+		// Wakeup, stop wait next expired timer
+		if timer != nil {
+			timer.Stop()
+			timer = nil
+		}
+
 		select {
 		case <-ctx.Done():
 			return
