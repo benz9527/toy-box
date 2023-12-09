@@ -2,6 +2,7 @@ package queue
 
 import (
 	"container/heap"
+	"sync/atomic"
 )
 
 // 使用最小堆来构建优先级队列
@@ -19,19 +20,19 @@ type pqItem[E comparable] struct {
 }
 
 func (item *pqItem[E]) GetPriority() int64 {
-	return item.priority
+	return atomic.LoadInt64(&item.priority)
 }
 
 func (item *pqItem[E]) SetPriority(priority int64) {
-	item.priority = priority
+	atomic.StoreInt64(&item.priority, priority)
 }
 
 func (item *pqItem[E]) GetIndex() int64 {
-	return item.index
+	return atomic.LoadInt64(&item.index)
 }
 
 func (item *pqItem[E]) SetIndex(index int64) {
-	item.index = index
+	atomic.SwapInt64(&item.index, index)
 }
 
 func (item *pqItem[E]) GetValue() E {
