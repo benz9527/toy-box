@@ -1,13 +1,12 @@
-package container_test
+package kv_test
 
 import (
 	"bytes"
+	"github.com/benz9527/toy-box/algo/kv"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"testing"
 	"time"
-
-	"github.com/benz9527/toy-box/toys/pkg/container"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/types"
@@ -47,7 +46,7 @@ var _ = ginkgo.Describe("Thread Safe Map Element io.Closer",
 	ginkgo.Label("ThreadSafeMap"),
 	func() {
 		ginkgo.It("should close all elements", func() {
-			m := container.NewThreadSafeMap[*testCloser]()
+			m := kv.NewThreadSafeMap[*testCloser]()
 			m.AddOrUpdate("1", &testCloser{id: "1", Writer: ginkgo.GinkgoWriter})
 			m.AddOrUpdate("2", &testCloser{id: "2", closeByErr: true, Writer: ginkgo.GinkgoWriter})
 			err := m.Close()
