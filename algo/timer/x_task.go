@@ -11,18 +11,37 @@ type elementTasker interface {
 	getAndReleaseElementRef() list.NodeElement[Task]
 }
 
-type task struct {
+type jobMetadata struct {
 	jobID        JobID
 	job          Job
 	expirationMs int64
-	slot         TimingWheelSlot
+	loopCount    int64
+	jobType      JobType
+}
+
+func (m *jobMetadata) GetJobID() JobID {
+	return m.jobID
+}
+
+func (m *jobMetadata) GetExpiredMs() int64 {
+	return m.expirationMs
+}
+
+func (m *jobMetadata) GetRestLoopCount() int64 {
+	return m.loopCount
+}
+
+func (m *jobMetadata) GetJobType() JobType {
+	return m.jobType
+}
+
+type task struct {
+	*jobMetadata
+	slot TimingWheelSlot
 	// Doubly pointer reference, it is easy for us to access the element in the list.
 	elementRef list.NodeElement[Task]
-
-	loopCount int64
-	cancelled atomic.Bool
-	taskType  TaskType
-	lock      *sync.RWMutex
+	cancelled  *atomic.Bool
+	lock       *sync.RWMutex
 }
 
 var (
@@ -42,6 +61,17 @@ func (t *task) GetJobID() JobID {
 	return t.jobID
 }
 
+func (t *task) GetJobMetadata() JobMetadata {
+	md := &jobMetadata{
+		jobID:        t.jobID,
+		job:          t.job,
+		expirationMs: t.expirationMs,
+		loopCount:    t.loopCount,
+		jobType:      t.jobType,
+	}
+	return md
+}
+
 func (t *task) GetRestLoopCount() int64 {
 	return atomic.LoadInt64(&t.loopCount)
 }
@@ -54,7 +84,7 @@ func (t *task) Cancelled() bool {
 	return t.cancelled.Load()
 }
 
-func (t *task) GetExpirationMs() int64 {
+func (t *task) GetExpiredMs() int64 {
 	return atomic.LoadInt64(&t.expirationMs)
 }
 
@@ -65,9 +95,6 @@ func (t *task) GetSlot() TimingWheelSlot {
 }
 
 func (t *task) setSlot(slot TimingWheelSlot) {
-	if slot == nil {
-		return
-	}
 	t.lock.Lock()
 	t.slot = slot
 	t.lock.Unlock()
@@ -85,11 +112,15 @@ func (t *task) setElementRef(elementRef list.NodeElement[Task]) {
 	t.lock.Unlock()
 }
 
-func (t *task) GetTaskType() TaskType {
-	return t.taskType
+func (t *task) GetJobType() JobType {
+	return t.jobType
 }
 
 func (t *task) Cancel() bool {
+	if t.Cancelled() {
+		return true
+	}
+
 	stopped := false
 	for slot := t.GetSlot(); slot != nil && !t.Cancelled(); slot = t.GetSlot() {
 		// Remove t from all timing wheel.
@@ -105,9 +136,9 @@ func (t *task) Cancel() bool {
 			break
 		}
 	}
-	if stopped && t.taskType == OnceTask {
+	if stopped && t.jobType == OnceJob {
 		atomic.SwapInt64(&t.loopCount, 0)
-	} else if stopped && t.taskType == RepeatTask {
+	} else if stopped && t.jobType == RepeatJob {
 		atomic.SwapInt64(&t.loopCount, t.GetRestLoopCount()-1)
 	}
 	return stopped
@@ -138,7 +169,7 @@ func (t *xScheduledTask) UpdateNextScheduledMs() {
 	if expiredMs == -1 {
 		return
 	}
-	t.beginMs = expiredMs
+	atomic.SwapInt64(&t.beginMs, expiredMs)
 }
 
 func (t *xScheduledTask) GetRestLoopCount() int64 {
@@ -171,11 +202,15 @@ func NewOnceTask(
 
 	t := &xTask{
 		task: &task{
-			jobID:        jobID,
-			expirationMs: expiredMs,
-			loopCount:    1,
-			job:          job,
-			lock:         &sync.RWMutex{},
+			jobMetadata: &jobMetadata{
+				jobID:        jobID,
+				expirationMs: expiredMs,
+				loopCount:    1,
+				job:          job,
+				jobType:      OnceJob,
+			},
+			lock:      &sync.RWMutex{},
+			cancelled: &atomic.Bool{},
 		},
 		ctx: ctx,
 	}
@@ -195,9 +230,13 @@ func NewRepeatTask(
 	t := &xScheduledTask{
 		xTask: &xTask{
 			task: &task{
-				jobID: jobID,
-				job:   job,
-				lock:  &sync.RWMutex{},
+				jobMetadata: &jobMetadata{
+					jobID:   jobID,
+					job:     job,
+					jobType: RepeatJob,
+				},
+				lock:      &sync.RWMutex{},
+				cancelled: &atomic.Bool{},
 			},
 			ctx: ctx,
 		},

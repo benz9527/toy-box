@@ -51,7 +51,7 @@ func (slot *xSlot) GetSlotID() int64 {
 }
 
 func (slot *xSlot) setSlotID(slotID int64) {
-	atomic.StoreInt64(&slot.slotID, slotID)
+	atomic.SwapInt64(&slot.slotID, slotID)
 }
 
 func (slot *xSlot) GetLevel() int64 {
@@ -59,14 +59,11 @@ func (slot *xSlot) GetLevel() int64 {
 }
 
 func (slot *xSlot) setLevel(level int64) {
-	atomic.StoreInt64(&slot.level, level)
+	atomic.SwapInt64(&slot.level, level)
 }
 
 func (slot *xSlot) AddTask(task Task) {
 	if task == nil {
-		return
-	}
-	if _, ok := task.(*xTask); !ok {
 		return
 	}
 
@@ -75,40 +72,47 @@ func (slot *xSlot) AddTask(task Task) {
 	slot.lock.Unlock()
 
 	task.setSlot(slot)
-	task.(*xTask).setElementRef(elementRefs[0])
+	switch _task := task.(type) {
+	case *xScheduledTask:
+		_task.setElementRef(elementRefs[0])
+	case *xTask:
+		_task.setElementRef(elementRefs[0])
+	}
 }
 
 func (slot *xSlot) removeTask(task Task) bool {
-	if slot == immediateExpiredSlot || task == nil {
+	if slot == immediateExpiredSlot || task == nil || task.GetSlot() != slot {
 		return false
 	}
-	if task.GetSlot() != slot {
-		return false
-	}
-	// remove task from slot but not cancel it
+	// Remove task from slot but not cancel it
 	slot.lock.Lock()
-	slot.tasks.Remove(task.(elementTasker).getAndReleaseElementRef())
-	slot.lock.Unlock()
-	// clean reference, avoid memory leak
-	task.setSlot(nil)
+	defer slot.lock.Unlock()
+	e := slot.tasks.Remove(task.(elementTasker).getAndReleaseElementRef())
+	if e == nil {
+		return false
+	}
+	task.setSlot(nil) // clean reference, avoid memory leak
 	return true
 }
 
 func (slot *xSlot) RemoveTask(task Task) bool {
-	if task == nil || task.Cancelled() {
-		return true
-	}
 	return slot.removeTask(task)
 }
 
+// Flush Timing wheel scheduling algorithm core function
 func (slot *xSlot) Flush(reinsert TaskReinsert) {
-	//slot.lock.Lock()
-	//defer slot.lock.Unlock()
-
-	// Fetch all tasks in the slot.
-	// Because the tasks are all expired.
+	// Due to the slot has been expired, we have to handle all tasks from the slot.
+	// 1. If the task is cancelled, we will remove it from the slot.
+	// 2. If the task is not cancelled:
+	//  2.1 Check the task is a high level timing wheel task or not.
+	//      If so, reinsert the task to the lower level timing wheel.
+	//      Otherwise, run the task.
+	//  2.2 If the task is a low level timing wheel task, run the task.
+	//      If the task is a repeat task, reinsert the task to the current timing wheel.
+	//      Otherwise, cancel it.
+	// 3. Remove the tasks from the slot.
+	// 4. Reset the slot, ready for next round.
 	slot.tasks.ForEach(func(idx int64, iterator list.NodeElement[Task]) {
-		// FIXME lock race
 		task := iterator.GetValue()
 		reinsert(task)
 		slot.removeTask(task)
