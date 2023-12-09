@@ -128,7 +128,7 @@ func TestXTimingWheels_AfterFunc(t *testing.T) {
 	t.Logf("final tw tasks: %d\n", tw.GetTaskCounter())
 }
 
-func TestXTimingWheels_ScheduleFunc(t *testing.T) {
+func TestXTimingWheels_ScheduleFunc_ConcurrentFinite(t *testing.T) {
 	ctx, cancel := context.WithTimeoutCause(context.Background(), 3*time.Second, errors.New("timeout"))
 	defer cancel()
 	tw := NewTimingWheels(
@@ -153,14 +153,89 @@ func TestXTimingWheels_ScheduleFunc(t *testing.T) {
 	}
 	sched := NewFiniteScheduler(delays...)
 	assert.NotNil(t, sched)
+	// FIXME Here will occur some errors:
+	//  1. only one task will be scheduled
+	//  2. one scheduled task will lost in the timing wheels
+	//  3. sometime the scheduling will be blocked
+	go func() {
+		task, err := tw.ScheduleFunc(sched, func(ctx context.Context, md JobMetadata) {
+			execAt := time.Now().UTC().UnixMilli()
+			slog.Info("sched1 after func", "expired ms", md.GetExpiredMs(), "exec at", execAt, "diff",
+				execAt-md.GetExpiredMs())
+		})
+		assert.NoError(t, err)
+		t.Logf("task1: %s\n", task.GetJobID())
+	}()
+	go func() {
+		task, err := tw.ScheduleFunc(sched, func(ctx context.Context, md JobMetadata) {
+			execAt := time.Now().UTC().UnixMilli()
+			slog.Info("sched2 after func", "expired ms", md.GetExpiredMs(), "exec at", execAt, "diff",
+				execAt-md.GetExpiredMs())
+		})
+		assert.NoError(t, err)
+		t.Logf("task2: %s\n", task.GetJobID())
+	}()
 
+	t.Logf("tw tickMs: %d\n", tw.GetTickMs())
+	t.Logf("tw startMs: %d\n", tw.GetStartMs())
+	t.Logf("tw slotSize: %d\n", tw.GetSlotSize())
+	t.Logf("tw tasks: %d\n", tw.GetTaskCounter())
+	<-ctx.Done()
+	time.Sleep(100 * time.Millisecond)
+	t.Logf("final tw tasks: %d\n", tw.GetTaskCounter())
+}
+
+func TestXTimingWheels_ScheduleFunc_1MsInfinite(t *testing.T) {
+	ctx, cancel := context.WithTimeoutCause(context.Background(), 3*time.Second, errors.New("timeout"))
+	defer cancel()
+	tw := NewTimingWheels(
+		ctx,
+		time.Now().UTC().UnixMilli(),
+	)
+
+	delays := []time.Duration{
+		time.Millisecond,
+	}
+	sched := NewInfiniteScheduler(delays...)
+	assert.NotNil(t, sched)
+	// FIXME 1ms infinite scheduling will occur critical delay execution error
 	task, err := tw.ScheduleFunc(sched, func(ctx context.Context, md JobMetadata) {
 		execAt := time.Now().UTC().UnixMilli()
-		slog.Info("sched after func", "expired ms", md.GetExpiredMs(), "exec at", execAt, "diff",
+		slog.Info("infinite sched1 after func", "expired ms", md.GetExpiredMs(), "exec at", execAt, "diff",
 			execAt-md.GetExpiredMs())
 	})
 	assert.NoError(t, err)
-	t.Logf("task: %s\n", task.GetJobID())
+	t.Logf("task1: %s\n", task.GetJobID())
+
+	t.Logf("tw tickMs: %d\n", tw.GetTickMs())
+	t.Logf("tw startMs: %d\n", tw.GetStartMs())
+	t.Logf("tw slotSize: %d\n", tw.GetSlotSize())
+	t.Logf("tw tasks: %d\n", tw.GetTaskCounter())
+	<-ctx.Done()
+	time.Sleep(100 * time.Millisecond)
+	t.Logf("final tw tasks: %d\n", tw.GetTaskCounter())
+}
+
+func TestXTimingWheels_ScheduleFunc_32MsInfinite(t *testing.T) {
+	ctx, cancel := context.WithTimeoutCause(context.Background(), 3*time.Second, errors.New("timeout"))
+	defer cancel()
+	tw := NewTimingWheels(
+		ctx,
+		time.Now().UTC().UnixMilli(),
+	)
+
+	delays := []time.Duration{
+		18 * time.Millisecond,
+	}
+	sched := NewInfiniteScheduler(delays...)
+	assert.NotNil(t, sched)
+	task, err := tw.ScheduleFunc(sched, func(ctx context.Context, md JobMetadata) {
+		execAt := time.Now().UTC().UnixMilli()
+		slog.Info("infinite sched32 after func", "expired ms", md.GetExpiredMs(), "exec at", execAt, "diff",
+			execAt-md.GetExpiredMs())
+	})
+	assert.NoError(t, err)
+	t.Logf("task1: %s\n", task.GetJobID())
 
 	t.Logf("tw tickMs: %d\n", tw.GetTickMs())
 	t.Logf("tw startMs: %d\n", tw.GetStartMs())

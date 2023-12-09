@@ -378,6 +378,9 @@ func (xtw *xTimingWheels) schedule(ctx context.Context) {
 	if ctx == nil {
 		return
 	}
+	// FIXME Block error mainly caused by producer and consumer speed mismatch, lock data race.
+	//  Is there any limitation mechanism could gradually  control different interval task‘s execution timeout timestamp?
+	//  Tasks piling up in the same slot will cause the timing wheel to be blocked or delayed.
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
@@ -506,14 +509,15 @@ func (xtw *xTimingWheels) addOrRunTask(t Task) {
 	var (
 		taskLevel int64
 		runNow    bool
+		slot      = t.GetSlot() // FIXME Concurrent read and write error
 	)
-	if t.GetSlot() != nil {
-		taskLevel = t.GetSlot().GetLevel()
-		runNow = t.GetSlot().GetExpirationMs() == sentinelSlotExpiredMs || taskLevel == 0
+	if slot != nil {
+		taskLevel = slot.GetLevel()
+		runNow = slot.GetExpirationMs() == sentinelSlotExpiredMs || taskLevel == 0
 	} else {
 		runNow = t.GetExpiredMs() <= time.Now().UTC().UnixMilli()
 	}
-	if runNow {
+	if runNow { // FIXME Delay scheduling error and go routine execution error
 		go t.GetJob()(xtw.ctx, t.GetJobMetadata())
 	}
 
