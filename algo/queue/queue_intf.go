@@ -2,6 +2,9 @@ package queue
 
 import "context"
 
+// Reference:
+// https://github.com/nsqio/nsq/blob/master/internal/pqueue/pqueue.go
+
 // Here I defined the interfaces for priority queue and delay queue.
 // In my plan, I will implement the priority queue and delay queue with array and heap.
 

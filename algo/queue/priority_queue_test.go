@@ -74,6 +74,31 @@ func TestPriorityQueue_MaxValueAsHighPriority(t *testing.T) {
 	}
 }
 
+func TestPriorityQueue_MaxValueAsHighPriority_Peek(t *testing.T) {
+	pq := NewArrayPriorityQueue[*person](32,
+		func(i, j PQItem[*person]) bool {
+			return i.GetPriority() > j.GetPriority()
+		},
+	)
+	pq.Push(NewPQItem[*person](&person{age: 10, name: "p0"}, 1))
+	pq.Push(NewPQItem[*person](&person{age: 101, name: "p1"}, 101))
+	pq.Push(NewPQItem[*person](&person{age: 10, name: "p2"}, 10))
+	pq.Push(NewPQItem[*person](&person{age: 200, name: "p3"}, 200))
+	pq.Push(NewPQItem[*person](&person{age: 3, name: "p4"}, 3))
+	pq.Push(NewPQItem[*person](&person{age: 1, name: "p5"}, 1))
+	pq.Push(NewPQItem[*person](&person{age: 5, name: "p6"}, 5))
+	pq.Push(NewPQItem[*person](&person{age: 200, name: "p7"}, 201))
+
+	expectedPriorities := []int64{201, 200, 101, 10, 5, 3, 1, 1}
+	for i, priority := range expectedPriorities {
+		peekItem := pq.Peek()
+		t.Logf("peek item: %v， priority: %d", peekItem.GetValue(), peekItem.GetPriority())
+		item := pq.Pop()
+		t.Logf("%v， priority: %d", item.GetValue(), item.GetPriority())
+		assert.Equal(t, priority, item.GetPriority(), "priority", i)
+	}
+}
+
 // goos: linux
 // goarch: amd64
 // pkg: github.com/benz9527/toy-box/algo/queue
