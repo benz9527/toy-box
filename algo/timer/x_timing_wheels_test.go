@@ -21,7 +21,6 @@ func TestTimingWheel_AlignmentAndSize(t *testing.T) {
 	t.Logf("tw slotSize alignment: %d\n", unsafe.Alignof(tw.slotSize))
 	t.Logf("tw globalTaskCounterRef alignment: %d\n", unsafe.Alignof(tw.globalTaskCounterRef))
 	t.Logf("tw globalSlotCounterRef alignment: %d\n", unsafe.Alignof(tw.globalSlotCounterRef))
-	t.Logf("tw lock alignment: %d\n", unsafe.Alignof(tw.lock))
 	t.Logf("tw overflowWheelRef alignment: %d\n", unsafe.Alignof(tw.overflowWheelRef))
 	t.Logf("tw globalDqRef alignment: %d\n", unsafe.Alignof(tw.globalDqRef))
 
@@ -33,7 +32,6 @@ func TestTimingWheel_AlignmentAndSize(t *testing.T) {
 	t.Logf("tw slotSize size: %d\n", unsafe.Sizeof(tw.slotSize))
 	t.Logf("tw globalTaskCounterRef size: %d\n", unsafe.Sizeof(tw.globalTaskCounterRef))
 	t.Logf("tw globalSlotCounterRef size: %d\n", unsafe.Sizeof(tw.globalSlotCounterRef))
-	t.Logf("tw lock size: %d\n", unsafe.Sizeof(tw.lock))
 	t.Logf("tw overflowWheelRef size: %d\n", unsafe.Sizeof(tw.overflowWheelRef))
 	t.Logf("tw globalDqRef size: %d\n", unsafe.Sizeof(tw.globalDqRef))
 }
@@ -42,29 +40,26 @@ func TestXTimingWheels_AlignmentAndSize(t *testing.T) {
 	tw := &xTimingWheels{}
 	t.Logf("tw alignment: %d\n", unsafe.Alignof(tw))
 	t.Logf("tw ctx alignment: %d\n", unsafe.Alignof(tw.ctx))
-	t.Logf("tw lock alignment: %d\n", unsafe.Alignof(tw.lock))
 	t.Logf("tw tw alignment: %d\n", unsafe.Alignof(tw.tw))
 	t.Logf("tw stopC alignment: %d\n", unsafe.Alignof(tw.stopC))
-	t.Logf("tw addTaskC alignment: %d\n", unsafe.Alignof(tw.addTaskC))
+	t.Logf("tw twEventC alignment: %d\n", unsafe.Alignof(tw.twEventC))
+	t.Logf("tw twEventPool alignment: %d\n", unsafe.Alignof(tw.twEventPool))
 	t.Logf("tw expiredSlotC alignment: %d\n", unsafe.Alignof(tw.expiredSlotC))
 	t.Logf("tw taskCounter alignment: %d\n", unsafe.Alignof(tw.taskCounter))
 	t.Logf("tw slotCounter alignment: %d\n", unsafe.Alignof(tw.slotCounter))
-	t.Logf("tw cancelTaskC alignment: %d\n", unsafe.Alignof(tw.cancelTaskC))
-	t.Logf("tw lock alignment: %d\n", unsafe.Alignof(tw.lock))
 	t.Logf("tw isRunning alignment: %d\n", unsafe.Alignof(tw.isRunning))
 	t.Logf("tw dq alignment: %d\n", unsafe.Alignof(tw.dq))
 	t.Logf("tw tasksMap alignment: %d\n", unsafe.Alignof(tw.tasksMap))
 
 	t.Logf("tw size: %d\n", unsafe.Sizeof(*tw))
 	t.Logf("tw ctx size: %d\n", unsafe.Sizeof(tw.ctx))
-	t.Logf("tw lock size: %d\n", unsafe.Sizeof(tw.lock))
 	t.Logf("tw tw size: %d\n", unsafe.Sizeof(tw.tw))
 	t.Logf("tw stopC size: %d\n", unsafe.Sizeof(tw.stopC))
-	t.Logf("tw addTaskC size: %d\n", unsafe.Sizeof(tw.addTaskC))
+	t.Logf("tw twEventC size: %d\n", unsafe.Sizeof(tw.twEventC))
+	t.Logf("tw twEventPool size: %d\n", unsafe.Sizeof(tw.twEventPool))
 	t.Logf("tw expiredSlotC size: %d\n", unsafe.Sizeof(tw.expiredSlotC))
 	t.Logf("tw taskCounter size: %d\n", unsafe.Sizeof(tw.taskCounter))
 	t.Logf("tw slotCounter size: %d\n", unsafe.Sizeof(tw.slotCounter))
-	t.Logf("tw cancelTaskC size: %d\n", unsafe.Sizeof(tw.cancelTaskC))
 	t.Logf("tw isRunning size: %d\n", unsafe.Sizeof(tw.isRunning))
 	t.Logf("tw dq size: %d\n", unsafe.Sizeof(tw.dq))
 	t.Logf("tw tasksMap size: %d\n", unsafe.Sizeof(tw.tasksMap))
@@ -186,7 +181,7 @@ func TestXTimingWheels_ScheduleFunc_ConcurrentFinite(t *testing.T) {
 }
 
 func TestXTimingWheels_ScheduleFunc_1MsInfinite(t *testing.T) {
-	ctx, cancel := context.WithTimeoutCause(context.Background(), 3*time.Second, errors.New("timeout"))
+	ctx, cancel := context.WithTimeoutCause(context.Background(), 1*time.Second, errors.New("timeout"))
 	defer cancel()
 	tw := NewTimingWheels(
 		ctx,

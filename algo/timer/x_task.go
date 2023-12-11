@@ -3,8 +3,8 @@ package timer
 import (
 	"context"
 	"github.com/benz9527/toy-box/algo/list"
-	"sync"
 	"sync/atomic"
+	"unsafe"
 )
 
 type elementTasker interface {
@@ -37,11 +37,11 @@ func (m *jobMetadata) GetJobType() JobType {
 
 type task struct {
 	*jobMetadata
-	slot TimingWheelSlot
+	slotMetadata TimingWheelSlotMetadata
+	slot         unsafe.Pointer // TimingWheelSlot
 	// Doubly pointer reference, it is easy for us to access the element in the list.
-	elementRef list.NodeElement[Task]
+	elementRef unsafe.Pointer // list.NodeElement[Task]
 	cancelled  *atomic.Bool
-	lock       *sync.RWMutex
 }
 
 var (
@@ -50,10 +50,8 @@ var (
 )
 
 func (t *task) getAndReleaseElementRef() list.NodeElement[Task] {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	ref := t.elementRef
-	t.elementRef = nil
+	ref := t.getElementRef()
+	t.setElementRef(nil)
 	return ref
 }
 
@@ -89,27 +87,27 @@ func (t *task) GetExpiredMs() int64 {
 }
 
 func (t *task) GetSlot() TimingWheelSlot {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-	return t.slot
+	return *(*TimingWheelSlot)(atomic.LoadPointer(&t.slot))
 }
 
 func (t *task) setSlot(slot TimingWheelSlot) {
-	t.lock.Lock()
-	t.slot = slot
-	t.lock.Unlock()
+	atomic.StorePointer(&t.slot, unsafe.Pointer(&slot))
+}
+
+func (t *task) GetPreviousSlotMetadata() TimingWheelSlotMetadata {
+	return t.slotMetadata
+}
+
+func (t *task) setSlotMetadata(slotMetadata TimingWheelSlotMetadata) {
+	t.slotMetadata = slotMetadata
 }
 
 func (t *task) getElementRef() list.NodeElement[Task] {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-	return t.elementRef
+	return *(*list.NodeElement[Task])(atomic.LoadPointer(&t.elementRef))
 }
 
 func (t *task) setElementRef(elementRef list.NodeElement[Task]) {
-	t.lock.Lock()
-	t.elementRef = elementRef
-	t.lock.Unlock()
+	atomic.StorePointer(&t.elementRef, unsafe.Pointer(&elementRef))
 }
 
 func (t *task) GetJobType() JobType {
@@ -117,31 +115,20 @@ func (t *task) GetJobType() JobType {
 }
 
 func (t *task) Cancel() bool {
-	if t.Cancelled() {
+	if stopped := t.cancelled.Swap(true); stopped {
+		// Previous value is true, it means that the task has been cancelled.
 		return true
 	}
 
-	stopped := false
-	for slot := t.GetSlot(); slot != nil && !t.Cancelled(); slot = t.GetSlot() {
-		// Remove t from all timing wheel.
-		// Actually, there is only one slot for the t.
-		// In this loop, we avoid 2 scenarios:
-		// 1. We remove the t from current slot by below method.
-		//  But at the same time, the t is expired and reinserted to the next slot,
-		//  which handled by slot.Flush() in other goroutine.
-		stopped = slot.RemoveTask(t)
-		if t.cancelled.Swap(true) {
-			// Previous value is true, it means that the task has been cancelled.
-			stopped = true
-			break
-		}
-	}
-	if stopped && t.jobType == OnceJob {
+	// If task is cancelled, it will be removed from the timing wheel automatically
+	// in other process, so we don't need to remove it here.
+
+	if t.jobType == OnceJob {
 		atomic.SwapInt64(&t.loopCount, 0)
-	} else if stopped && t.jobType == RepeatJob {
+	} else if t.jobType == RepeatedJob {
 		atomic.SwapInt64(&t.loopCount, t.GetRestLoopCount()-1)
 	}
-	return stopped
+	return true
 }
 
 type xTask struct {
@@ -177,7 +164,7 @@ func (t *xScheduledTask) GetRestLoopCount() int64 {
 }
 
 func (t *xScheduledTask) getAndReleaseElementRef() list.NodeElement[Task] {
-	return t.elementRef
+	return t.task.getAndReleaseElementRef()
 }
 
 func (t *xScheduledTask) Cancel() bool {
@@ -209,7 +196,6 @@ func NewOnceTask(
 				job:          job,
 				jobType:      OnceJob,
 			},
-			lock:      &sync.RWMutex{},
 			cancelled: &atomic.Bool{},
 		},
 		ctx: ctx,
@@ -233,9 +219,8 @@ func NewRepeatTask(
 				jobMetadata: &jobMetadata{
 					jobID:   jobID,
 					job:     job,
-					jobType: RepeatJob,
+					jobType: RepeatedJob,
 				},
-				lock:      &sync.RWMutex{},
 				cancelled: &atomic.Bool{},
 			},
 			ctx: ctx,

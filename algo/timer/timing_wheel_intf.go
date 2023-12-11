@@ -76,14 +76,14 @@ type JobType uint8
 
 const (
 	OnceJob JobType = iota
-	RepeatJob
+	RepeatedJob
 )
 
 func (t JobType) String() string {
 	switch t {
 	case OnceJob:
 		return "once"
-	case RepeatJob:
+	case RepeatedJob:
 		return "repeat"
 	default:
 	}
@@ -115,6 +115,10 @@ type Task interface {
 	GetSlot() TimingWheelSlot
 	// setSlot sets the slot of the job, it is a private method.
 	setSlot(slot TimingWheelSlot)
+	// GetPreviousSlotMetadata returns the previous slot metadata of the job.
+	GetPreviousSlotMetadata() TimingWheelSlotMetadata
+	// setPreviousSlotMetadata sets the current slot metadata of the job.
+	setSlotMetadata(slotMetadata TimingWheelSlotMetadata)
 	Cancel() bool
 	Cancelled() bool
 }
@@ -125,7 +129,7 @@ type ScheduledTask interface {
 	UpdateNextScheduledMs()
 }
 
-// TaskReinsert is a function that reinserts a task into the timing wheel.
+// TaskHandler is a function that reinserts a task into the timing wheel.
 // It means that the task should be executed periodically or repeatedly for a certain times.
 // Reinsert will add current task to next slot, higher level slot (overflow wheel) or
 // the same level slot (current wheel) depending on the expirationMs of the task.
@@ -134,7 +138,7 @@ type ScheduledTask interface {
 //  2. Check if the task's loop count is greater than 0. If so, decrease the loop count and reinsert.
 //  3. Check if the task's loop count is -1 (run forever unless cancel manually).
 //     If so, reinsert and update the expirationMs.
-type TaskReinsert func(Task) // Core function
+type TaskHandler func(Task) // Core function
 
 type TimingWheelSlotMetadata interface {
 	// GetExpirationMs returns the expirationMs of the slot.
@@ -154,11 +158,13 @@ type TimingWheelSlotMetadata interface {
 // TimingWheelSlot is the interface that wraps the slot, in kafka, it is called bucket.
 type TimingWheelSlot interface {
 	TimingWheelSlotMetadata
+	// GetMetadata returns the metadata of the slot.
+	GetMetadata() TimingWheelSlotMetadata
 	// AddTask adds a task to the slot.
 	AddTask(Task)
 	// RemoveTask removes a task from the slot.
 	RemoveTask(Task) bool
 	// Flush flushes all tasks in the slot generally,
 	// but it should be called in a loop.
-	Flush(TaskReinsert)
+	Flush(TaskHandler)
 }
