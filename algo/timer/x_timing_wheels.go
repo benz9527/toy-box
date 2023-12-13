@@ -102,8 +102,8 @@ func (tw *timingWheel) GetSlotSize() int64 {
 	return atomic.LoadInt64(&tw.slotSize)
 }
 
-func (tw *timingWheel) getOverflowTimingWheel() *timingWheel {
-	return *(**timingWheel)(atomic.LoadPointer(&tw.overflowWheelRef))
+func (tw *timingWheel) getOverflowTimingWheel() TimingWheel {
+	return *(*TimingWheel)(atomic.LoadPointer(&tw.overflowWheelRef))
 }
 
 func (tw *timingWheel) setOverflowTimingWheel(oftw TimingWheel) {
@@ -119,7 +119,7 @@ func (tw *timingWheel) advanceClock(slotExpiredMs int64) {
 		atomic.StoreInt64(&tw.currentTimeMs, currentTimeMs)      // update the current time
 		oftw := tw.getOverflowTimingWheel()
 		if oftw != nil {
-			oftw.advanceClock(currentTimeMs)
+			oftw.(*timingWheel).advanceClock(currentTimeMs)
 		}
 	}
 }
@@ -178,7 +178,7 @@ func (tw *timingWheel) addTask(task Task, level int64) error {
 			))
 		}
 		// Tail recursive call, it will be free the previous stack frame.
-		return tw.getOverflowTimingWheel().addTask(task, level+1)
+		return tw.getOverflowTimingWheel().(*timingWheel).addTask(task, level+1)
 	}
 }
 
