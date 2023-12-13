@@ -10,6 +10,7 @@ type timingWheelOperation uint8
 const (
 	unknown timingWheelOperation = iota
 	addTask
+	reAddTask
 	cancelTask
 )
 
@@ -31,8 +32,8 @@ func (e *timingWheelEvent) GetOperation() timingWheelOperation {
 	return e.operation
 }
 
-func (e *timingWheelEvent) GetAddTask() (Task, bool) {
-	if e.operation != addTask {
+func (e *timingWheelEvent) GetTask() (Task, bool) {
+	if e.operation != addTask && e.operation != reAddTask {
 		return nil, false
 	}
 
@@ -69,6 +70,15 @@ func (e *timingWheelEvent) AddTask(task Task) {
 		return
 	}
 	e.operation = addTask
+	e.obj.Store(task)
+	e.hasSetup = true
+}
+
+func (e *timingWheelEvent) ReAddTask(task Task) {
+	if e.hasSetup {
+		return
+	}
+	e.operation = reAddTask
 	e.obj.Store(task)
 	e.hasSetup = true
 }

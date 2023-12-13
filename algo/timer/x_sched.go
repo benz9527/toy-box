@@ -65,7 +65,7 @@ func (x *xScheduler) next(beginMs int64) (nextExpiredMs int64) {
 
 func (x *xScheduler) GetRestLoopCount() int64 {
 	if x.isFinite {
-		return int64(len(x.intervals) - x.currentIndex + 1)
+		return int64(len(x.intervals) - x.currentIndex)
 	}
 	return -1
 }

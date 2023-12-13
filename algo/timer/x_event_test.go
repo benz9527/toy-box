@@ -16,7 +16,7 @@ func TestNewTimingWheelEventsPool(t *testing.T) {
 			jobID: "1",
 		},
 	})
-	task, ok := event.GetAddTask()
+	task, ok := event.GetTask()
 	assert.True(t, ok)
 	assert.Equal(t, JobID("1"), task.GetJobID())
 	jobID, ok := event.GetCancelTaskJobID()
