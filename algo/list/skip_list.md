@@ -30,6 +30,8 @@
 
 ![跳表插入](./assets/skiplist-insert.png)
 
+![跳表插入动态](./assets/skiplist.gif)
+
 每个元素插入时要随机生成level
 
 最底层的链表里面存放了所有的元素
@@ -44,6 +46,26 @@
 
 跳表中，每一层索引其实都是一个有序的单链表，单链表删除元素的时间复杂度为 O(1)，索引层数为 logn 表示最多需要删除 logn 个元素，所以删除元素的总时间包含 查找元素的时间 加 删除 logn个元素的时间 为 O(logn) + O(logn) = 2 O(logn)，忽略常数部分，删除元素的时间复杂度为 O(logn)。
 
+## 无锁并发跳表
+
+### 无锁删除
+
+- 铰接点：指的是当前结点的前一个结点
+
+### EBR (epoch based reclamation)
+基于世代的回收算法。引入经典的读、删并发场景。
+
+例如链表读取的线程在读取节点N，但N节点已经被另一个并发线程删除，由于存在线程任意顺序执行的组合，读线程可能拿到了一个删除且回收的节点。
+
+
 # References
 
 https://www.jianshu.com/p/9d8296562806
+
+https://zhuanlan.zhihu.com/p/600729377
+
+https://zhuanlan.zhihu.com/p/600961328
+
+https://github.com/zzy590/article-code/blob/main/concurrent_skip_list.h
+
+https://github.com/facebook/rocksdb/blob/main/memtable/inlineskiplist.h
