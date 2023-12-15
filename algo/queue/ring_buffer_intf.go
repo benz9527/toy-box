@@ -12,3 +12,9 @@ type RingBuffer[T any] interface {
 	LoadElement(cursor uint64) (RingBufferElement[T], bool)
 	StoreElement(cursor uint64, value T)
 }
+
+type RingBufferCursor interface {
+	Increase() uint64
+	AtomicLoad() uint64
+	CASStore(old, new uint64) bool
+}
