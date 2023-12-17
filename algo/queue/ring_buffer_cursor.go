@@ -21,7 +21,7 @@ type xRingBufferCursor struct {
 	// avoid load into cpu cache will be broken by others data
 	// to compose a data race cache line
 	_      [7]uint64 // padding for CPU cache line, avoid false sharing
-	cursor uint64
+	cursor uint64    // space waste to exchange for performance
 	_      [7]uint64 // padding for CPU cache line, avoid false sharing
 }
 
