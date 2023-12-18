@@ -32,14 +32,14 @@ func (e *xRingBufferElement[T]) setCursor(cursor uint64) {
 
 type xRingBuffer[T any] struct {
 	capacityMask uint64
-	buffer       []RingBufferElement[T]
+	buffer       []*xRingBufferElement[T]
 	valueGuard   T
 }
 
 func NewXRingBuffer[T any](capacity uint64) RingBuffer[T] {
 	rb := &xRingBuffer[T]{
 		capacityMask: capacity - 1,
-		buffer:       make([]RingBufferElement[T], capacity),
+		buffer:       make([]*xRingBufferElement[T], capacity),
 		valueGuard:   *new(T),
 	}
 	for i := uint64(0); i < capacity; i++ {

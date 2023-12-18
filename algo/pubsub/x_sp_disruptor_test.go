@@ -3,6 +3,8 @@ package pubsub
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"log/slog"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -153,4 +155,32 @@ func TestCacheChannel(t *testing.T) {
 			testNoCacheChannel(t, 1024*1024, tc.gTotal, tc.tasks)
 		})
 	}
+}
+
+func TestXSinglePipelineDisruptorWithRandomSleepEventHandler(t *testing.T) {
+	num := 10
+	wg := &sync.WaitGroup{}
+	wg.Add(num)
+	disruptor := NewXSinglePipelineDisruptor[string](2,
+		NewXGoSchedBlockStrategy(),
+		func(event string) error {
+			nextInt := rand.Intn(100)
+			time.Sleep(time.Duration(nextInt) * time.Millisecond)
+			slog.Info("event details", "name", event)
+			wg.Done()
+			return nil
+		},
+	)
+	if err := disruptor.Start(); err != nil {
+		t.Fatalf("disruptor start failed, err: %v", err)
+	}
+	for i := 0; i < 10; i++ {
+		if _, _, err := disruptor.Publish(fmt.Sprintf("event-%d", i)); err != nil {
+			t.Logf("publish failed, err: %v", err)
+			break
+		}
+	}
+	wg.Wait()
+	err := disruptor.Stop()
+	assert.NoError(t, err)
 }
