@@ -54,8 +54,8 @@ func (rb *xRingBuffer[T]) Capacity() uint64 {
 
 func (rb *xRingBuffer[T]) StoreElement(cursor uint64, value T) {
 	e := rb.buffer[cursor&rb.capacityMask]
-	e.setValue(value)
 	e.setCursor(cursor + 1)
+	e.setValue(value)
 }
 
 func (rb *xRingBuffer[T]) LoadElement(cursor uint64) (RingBufferElement[T], bool) {

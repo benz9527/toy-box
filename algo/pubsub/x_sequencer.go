@@ -7,9 +7,9 @@ import (
 )
 
 type xSequencer struct {
-	capacity    uint64
-	readCursor  uint64                 // synchronize read
 	writeCursor queue.RingBufferCursor // concurrent write
+	readCursor  uint64                 // synchronize read
+	capacity    uint64
 }
 
 func NewXSequencer(capacity uint64) Sequencer {

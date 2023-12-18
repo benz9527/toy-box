@@ -9,6 +9,32 @@ import (
 	"time"
 )
 
+func TestCeilCapacity(t *testing.T) {
+	testcases := []struct {
+		capacity uint64
+		ceil     uint64
+	}{
+		{0, 2},
+		{1, 2},
+		{2, 2},
+		{3, 4},
+		{4, 4},
+		{7, 8},
+		{8, 8},
+		{9, 16},
+		{16, 16},
+		{31, 32},
+		{32, 32},
+		{58, 64},
+		{64, 64},
+	}
+	for _, tc := range testcases {
+		t.Run(fmt.Sprintf("capacity: %d, ceil: %d", tc.capacity, tc.ceil), func(t *testing.T) {
+			assert.Equal(t, tc.ceil, ceilCapacity(tc.capacity))
+		})
+	}
+}
+
 func testXSinglePipelineDisruptor(t *testing.T, gTotal, tasks int) {
 	counter := &atomic.Int64{}
 	wg := &sync.WaitGroup{}

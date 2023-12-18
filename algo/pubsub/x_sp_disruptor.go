@@ -46,14 +46,14 @@ func NewXSinglePipelineDisruptor[T any](
 	return d
 }
 
-func (x *xSinglePipelineDisruptor[T]) Start() error {
-	if atomic.CompareAndSwapInt32((*int32)(&x.status), int32(disruptorReady), int32(disruptorRunning)) {
-		if err := x.sub.Start(); err != nil {
-			atomic.StoreInt32((*int32)(&x.status), int32(disruptorReady))
+func (dis *xSinglePipelineDisruptor[T]) Start() error {
+	if atomic.CompareAndSwapInt32((*int32)(&dis.status), int32(disruptorReady), int32(disruptorRunning)) {
+		if err := dis.sub.Start(); err != nil {
+			atomic.StoreInt32((*int32)(&dis.status), int32(disruptorReady))
 			return err
 		}
-		if err := x.pub.Start(); err != nil {
-			atomic.StoreInt32((*int32)(&x.status), int32(disruptorReady))
+		if err := dis.pub.Start(); err != nil {
+			atomic.StoreInt32((*int32)(&dis.status), int32(disruptorReady))
 			return err
 		}
 		return nil
@@ -61,14 +61,14 @@ func (x *xSinglePipelineDisruptor[T]) Start() error {
 	return fmt.Errorf("disruptor already started")
 }
 
-func (x *xSinglePipelineDisruptor[T]) Stop() error {
-	if atomic.CompareAndSwapInt32((*int32)(&x.status), int32(disruptorRunning), int32(disruptorReady)) {
-		if err := x.pub.Stop(); err != nil {
-			atomic.CompareAndSwapInt32((*int32)(&x.status), int32(disruptorRunning), int32(disruptorReady))
+func (dis *xSinglePipelineDisruptor[T]) Stop() error {
+	if atomic.CompareAndSwapInt32((*int32)(&dis.status), int32(disruptorRunning), int32(disruptorReady)) {
+		if err := dis.pub.Stop(); err != nil {
+			atomic.CompareAndSwapInt32((*int32)(&dis.status), int32(disruptorRunning), int32(disruptorReady))
 			return err
 		}
-		if err := x.sub.Stop(); err != nil {
-			atomic.CompareAndSwapInt32((*int32)(&x.status), int32(disruptorRunning), int32(disruptorReady))
+		if err := dis.sub.Stop(); err != nil {
+			atomic.CompareAndSwapInt32((*int32)(&dis.status), int32(disruptorRunning), int32(disruptorReady))
 			return err
 		}
 		return nil
@@ -76,27 +76,27 @@ func (x *xSinglePipelineDisruptor[T]) Stop() error {
 	return fmt.Errorf("disruptor already stopped")
 }
 
-func (x *xSinglePipelineDisruptor[T]) IsStopped() bool {
-	return atomic.LoadInt32((*int32)(&x.status)) != int32(disruptorRunning)
+func (dis *xSinglePipelineDisruptor[T]) IsStopped() bool {
+	return atomic.LoadInt32((*int32)(&dis.status)) != int32(disruptorRunning)
 }
 
-func (x *xSinglePipelineDisruptor[T]) Publish(event T) (uint64, bool, error) {
-	return x.pub.Publish(event)
+func (dis *xSinglePipelineDisruptor[T]) Publish(event T) (uint64, bool, error) {
+	return dis.pub.Publish(event)
 }
 
-func (x *xSinglePipelineDisruptor[T]) PublishTimeout(event T, timeout time.Duration) (uint64, bool, error) {
-	return x.pub.PublishTimeout(event, timeout)
+func (dis *xSinglePipelineDisruptor[T]) PublishTimeout(event T, timeout time.Duration) (uint64, bool, error) {
+	return dis.pub.PublishTimeout(event, timeout)
 }
 
-func (x *xSinglePipelineDisruptor[T]) RegisterSubscriber(sub Subscriber[T]) error {
+func (dis *xSinglePipelineDisruptor[T]) RegisterSubscriber(sub Subscriber[T]) error {
 	// Single pipeline disruptor only support one subscriber to consume the events.
 	// It will be registered at the construction.
 	return nil
 }
 
 func ceilCapacity(capacity uint64) uint64 {
-	if capacity&(capacity-1) == 0 {
-		return capacity
+	if capacity < 2 {
+		return 2
 	}
 	var _cap uint64 = 1
 	for _cap < capacity {

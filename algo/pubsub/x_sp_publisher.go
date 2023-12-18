@@ -40,50 +40,49 @@ func newXSinglePipelinePublisher[T any](seq Sequencer, rb queue.RingBuffer[T], s
 	}
 }
 
-func (x *xSinglePipelinePublisher[T]) Start() error {
-	if atomic.CompareAndSwapInt32((*int32)(&x.status), int32(pubReady), int32(pubRunning)) {
+func (pub *xSinglePipelinePublisher[T]) Start() error {
+	if atomic.CompareAndSwapInt32((*int32)(&pub.status), int32(pubReady), int32(pubRunning)) {
 		return nil
 	}
 	return fmt.Errorf("publisher already started")
 }
 
-func (x *xSinglePipelinePublisher[T]) Stop() error {
-	if atomic.CompareAndSwapInt32((*int32)(&x.status), int32(pubRunning), int32(pubReady)) {
+func (pub *xSinglePipelinePublisher[T]) Stop() error {
+	if atomic.CompareAndSwapInt32((*int32)(&pub.status), int32(pubRunning), int32(pubReady)) {
 		return nil
 	}
 	return fmt.Errorf("publisher already stopped")
 }
 
-func (x *xSinglePipelinePublisher[T]) IsStopped() bool {
-	return atomic.LoadInt32((*int32)(&x.status)) == int32(pubReady)
+func (pub *xSinglePipelinePublisher[T]) IsStopped() bool {
+	return atomic.LoadInt32((*int32)(&pub.status)) == int32(pubReady)
 }
 
-func (x *xSinglePipelinePublisher[T]) Publish(event T) (uint64, bool, error) {
-	if x.IsStopped() {
+func (pub *xSinglePipelinePublisher[T]) Publish(event T) (uint64, bool, error) {
+	if pub.IsStopped() {
 		return 0, false, fmt.Errorf("publisher closed")
 	}
-	nextCursor := x.seq.GetWriteCursor().Increase()
+	nextWriteCursor := pub.seq.GetWriteCursor().Increase()
 	for {
-		readCursor := x.seq.LoadReadCursor() - 1
-		if nextCursor <= readCursor+x.seq.Capacity() {
-			x.rb.StoreElement(nextCursor-1, event)
-			x.strategy.Done()
-			return nextCursor, true, nil
+		readCursor := pub.seq.LoadReadCursor() - 1
+		if nextWriteCursor <= readCursor+pub.seq.Capacity() {
+			pub.rb.StoreElement(nextWriteCursor-1, event)
+			pub.strategy.Done()
+			return nextWriteCursor, true, nil
 		}
 		runtime.Gosched()
-		if x.IsStopped() {
+		if pub.IsStopped() {
 			return 0, false, fmt.Errorf("publisher closed")
 		}
 	}
-
 }
 
-func (x *xSinglePipelinePublisher[T]) PublishTimeout(event T, timeout time.Duration) (uint64, bool, error) {
-	if x.IsStopped() {
+func (pub *xSinglePipelinePublisher[T]) PublishTimeout(event T, timeout time.Duration) (uint64, bool, error) {
+	if pub.IsStopped() {
 		return 0, false, fmt.Errorf("publisher closed")
 	}
-	nextCursor := x.seq.GetWriteCursor().Increase()
-	ok := x.publishAt(event, nextCursor)
+	nextCursor := pub.seq.GetWriteCursor().Increase()
+	ok := pub.publishAt(event, nextCursor)
 	if ok {
 		return nextCursor, true, nil
 	}
@@ -94,33 +93,33 @@ func (x *xSinglePipelinePublisher[T]) PublishTimeout(event T, timeout time.Durat
 		case <-ctx.Done():
 			return 0, false, fmt.Errorf("publish timeout")
 		default:
-			if ok = x.publishAt(event, nextCursor); ok {
+			if ok = pub.publishAt(event, nextCursor); ok {
 				return nextCursor, true, nil
 			}
 			runtime.Gosched()
 		}
-		if x.IsStopped() {
+		if pub.IsStopped() {
 			return 0, false, fmt.Errorf("publisher closed")
 		}
 	}
 }
 
 // unstable result under concurrent scenario
-func (x *xSinglePipelinePublisher[T]) tryWriteWindow() int {
-	tryNext := x.seq.GetWriteCursor().AtomicLoad() + 1
-	readCursor := x.seq.LoadReadCursor()
-	if tryNext < readCursor+x.capacity {
-		return int(readCursor + x.seq.Capacity() - tryNext)
+func (pub *xSinglePipelinePublisher[T]) tryWriteWindow() int {
+	tryNext := pub.seq.GetWriteCursor().AtomicLoad() + 1
+	readCursor := pub.seq.LoadReadCursor()
+	if tryNext < readCursor+pub.capacity {
+		return int(readCursor + pub.seq.Capacity() - tryNext)
 	}
-	return -int(tryNext - (readCursor + x.seq.Capacity()))
+	return -int(tryNext - (readCursor + pub.seq.Capacity()))
 }
 
-func (x *xSinglePipelinePublisher[T]) publishAt(event T, cursor uint64) bool {
-	idx := x.seq.LoadReadCursor() - 1
-	if cursor > idx+x.seq.Capacity() {
+func (pub *xSinglePipelinePublisher[T]) publishAt(event T, cursor uint64) bool {
+	idx := pub.seq.LoadReadCursor() - 1
+	if cursor > idx+pub.seq.Capacity() {
 		return false
 	}
-	x.rb.StoreElement(cursor-1, event)
-	x.strategy.Done()
+	pub.rb.StoreElement(cursor-1, event)
+	pub.strategy.Done()
 	return true
 }
