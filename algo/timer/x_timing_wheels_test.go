@@ -111,7 +111,9 @@ func testAfterFunc(t *testing.T) {
 		//lowResolutionBeginTs := time.Now().UTC().UnixMilli()
 		_, err := tw.AfterFunc(delays[i], func(ctx context.Context, md JobMetadata) {
 			actualExecCount++
-			//slog.Info("after func", "expired ms", md.GetExpiredMs(), "exec at", lowResolutionBeginTs, "diff", md.GetExpiredMs()-lowResolutionBeginTs)
+			//execAt := time.Now().UTC().UnixMilli()
+			//slog.Info("after func", "expired ms", md.GetExpiredMs(), "exec at", execAt,
+			//	"interval", md.GetExpiredMs()-lowResolutionBeginTs, "diff", execAt-md.GetExpiredMs())
 		})
 		assert.NoError(t, err)
 	}
