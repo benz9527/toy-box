@@ -37,12 +37,12 @@ func TestCeilCapacity(t *testing.T) {
 	}
 }
 
-func testXSinglePipelineDisruptor(t *testing.T, gTotal, tasks int) {
+func testXSinglePipelineDisruptor(t *testing.T, gTotal, tasks int, bs BlockStrategy) {
 	counter := &atomic.Int64{}
 	wg := &sync.WaitGroup{}
 	wg.Add(gTotal)
 	disruptor := NewXSinglePipelineDisruptor[int](1024*1024,
-		NewXGoSchedBlockStrategy(),
+		bs,
 		func(event int) error {
 			counter.Add(1)
 			return nil
@@ -76,17 +76,19 @@ func TestXSinglePipelineDisruptor(t *testing.T) {
 	testcases := []struct {
 		gTotal int
 		tasks  int
+		bs     BlockStrategy
 	}{
-		{10, 100},
-		{100, 10000},
-		{500, 10000},
-		{1000, 10000},
-		{5000, 10000},
-		{10000, 10000},
+		{10, 100, NewXGoSchedBlockStrategy()},
+		{100, 10000, NewXGoSchedBlockStrategy()},
+		{500, 10000, NewXGoSchedBlockStrategy()},
+		{1000, 10000, NewXGoSchedBlockStrategy()},
+		{5000, 10000, NewXGoSchedBlockStrategy()},
+		{10000, 10000, NewXGoSchedBlockStrategy()},
+		{5000, 10000, NewXNoCacheChannelBlockStrategy()},
 	}
 	for _, tc := range testcases {
 		t.Run(fmt.Sprintf("gTotal: %d, tasks: %d", tc.gTotal, tc.tasks), func(t *testing.T) {
-			testXSinglePipelineDisruptor(t, tc.gTotal, tc.tasks)
+			testXSinglePipelineDisruptor(t, tc.gTotal, tc.tasks, tc.bs)
 		})
 	}
 }
@@ -158,12 +160,11 @@ func TestCacheChannel(t *testing.T) {
 	}
 }
 
-func TestXSinglePipelineDisruptorWithRandomSleepEvent(t *testing.T) {
-	num := 100
+func testXSinglePipelineDisruptorWithRandomSleep(t *testing.T, num, capacity int) {
 	wg := &sync.WaitGroup{}
 	wg.Add(num)
 	results := map[string]struct{}{}
-	disruptor := NewXSinglePipelineDisruptor[string](2,
+	disruptor := NewXSinglePipelineDisruptor[string](uint64(capacity),
 		NewXNoCacheChannelBlockStrategy(),
 		func(event string) error {
 			nextInt := rand.Intn(100)
@@ -187,6 +188,26 @@ func TestXSinglePipelineDisruptorWithRandomSleepEvent(t *testing.T) {
 	assert.Equal(t, num, len(results))
 	for i := 0; i < num; i++ {
 		assert.Contains(t, results, fmt.Sprintf("event-%d", i))
+	}
+}
+
+func TestXSinglePipelineDisruptorWithRandomSleepEvent(t *testing.T) {
+	testcases := []struct {
+		num      int
+		capacity int
+	}{
+		{10, 2},
+		{100, 4},
+		{200, 10},
+		{500, 20},
+	}
+	loops := 2
+	for i := 0; i < loops; i++ {
+		for _, tc := range testcases {
+			t.Run(fmt.Sprintf("num: %d, capacity: %d", tc.num, tc.capacity), func(t *testing.T) {
+				testXSinglePipelineDisruptorWithRandomSleep(t, tc.num, tc.capacity)
+			})
+		}
 	}
 }
 

@@ -66,7 +66,7 @@ func (pub *xSinglePipelinePublisher[T]) Publish(event T) (uint64, bool, error) {
 	nextWriteCursor := pub.seq.GetWriteCursor().Increase()
 	for {
 		readCursor := pub.seq.LoadReadCursor() - 1
-		if nextWriteCursor <= readCursor+pub.seq.Capacity() {
+		if nextWriteCursor <= readCursor+pub.capacity {
 			pub.rb.StoreElement(nextWriteCursor-1, event)
 			pub.strategy.Done()
 			return nextWriteCursor, true, nil
@@ -113,9 +113,9 @@ func (pub *xSinglePipelinePublisher[T]) tryWriteWindow() int {
 	tryNext := pub.seq.GetWriteCursor().AtomicLoad() + 1
 	readCursor := pub.seq.LoadReadCursor()
 	if tryNext < readCursor+pub.capacity {
-		return int(readCursor + pub.seq.Capacity() - tryNext)
+		return int(readCursor + pub.capacity - tryNext)
 	}
-	return -int(tryNext - (readCursor + pub.seq.Capacity()))
+	return -int(tryNext - (readCursor + pub.capacity))
 }
 
 func (pub *xSinglePipelinePublisher[T]) publishAt(event T, cursor uint64) bool {

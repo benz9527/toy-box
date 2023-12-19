@@ -18,16 +18,8 @@ func (e *xRingBufferElement[T]) GetValue() T {
 	return e.value
 }
 
-func (e *xRingBufferElement[T]) setValue(v T) {
-	e.value = v
-}
-
 func (e *xRingBufferElement[T]) GetCursor() uint64 {
 	return atomic.LoadUint64(&e.cursor)
-}
-
-func (e *xRingBufferElement[T]) setCursor(cursor uint64) {
-	atomic.StoreUint64(&e.cursor, cursor)
 }
 
 type xRingBuffer[T any] struct {
@@ -54,13 +46,13 @@ func (rb *xRingBuffer[T]) Capacity() uint64 {
 
 func (rb *xRingBuffer[T]) StoreElement(cursor uint64, value T) {
 	e := rb.buffer[cursor&rb.capacityMask]
-	e.setCursor(cursor + 1)
-	e.setValue(value)
+	atomic.StoreUint64(&e.cursor, cursor)
+	e.value = value
 }
 
 func (rb *xRingBuffer[T]) LoadElement(cursor uint64) (RingBufferElement[T], bool) {
 	e := rb.buffer[cursor&rb.capacityMask]
-	if e.GetCursor() == cursor+1 {
+	if e.GetCursor() == cursor {
 		return e, true
 	}
 	return &xRingBufferElement[T]{

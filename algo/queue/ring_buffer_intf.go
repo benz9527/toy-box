@@ -2,9 +2,7 @@ package queue
 
 type RingBufferElement[T any] interface {
 	GetValue() T
-	setValue(v T)
 	GetCursor() uint64
-	setCursor(cursor uint64)
 }
 
 type RingBuffer[T any] interface {
