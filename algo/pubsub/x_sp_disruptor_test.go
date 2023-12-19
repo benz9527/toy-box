@@ -77,6 +77,7 @@ func TestXSinglePipelineDisruptor(t *testing.T) {
 		gTotal int
 		tasks  int
 	}{
+		{10, 100},
 		{100, 10000},
 		{500, 10000},
 		{1000, 10000},
@@ -157,16 +158,17 @@ func TestCacheChannel(t *testing.T) {
 	}
 }
 
-func TestXSinglePipelineDisruptorWithRandomSleepEventHandler(t *testing.T) {
-	num := 10
+func TestXSinglePipelineDisruptorWithRandomSleepEvent(t *testing.T) {
+	num := 100
 	wg := &sync.WaitGroup{}
 	wg.Add(num)
+	results := map[string]struct{}{}
 	disruptor := NewXSinglePipelineDisruptor[string](2,
-		NewXGoSchedBlockStrategy(),
+		NewXNoCacheChannelBlockStrategy(),
 		func(event string) error {
 			nextInt := rand.Intn(100)
 			time.Sleep(time.Duration(nextInt) * time.Millisecond)
-			slog.Info("event details", "name", event)
+			results[event] = struct{}{}
 			wg.Done()
 			return nil
 		},
@@ -174,13 +176,42 @@ func TestXSinglePipelineDisruptorWithRandomSleepEventHandler(t *testing.T) {
 	if err := disruptor.Start(); err != nil {
 		t.Fatalf("disruptor start failed, err: %v", err)
 	}
-	for i := 0; i < 10; i++ {
+	for i := 0; i < num; i++ {
 		if _, _, err := disruptor.Publish(fmt.Sprintf("event-%d", i)); err != nil {
 			t.Logf("publish failed, err: %v", err)
-			break
 		}
 	}
 	wg.Wait()
+	err := disruptor.Stop()
+	assert.NoError(t, err)
+	assert.Equal(t, num, len(results))
+	for i := 0; i < num; i++ {
+		assert.Contains(t, results, fmt.Sprintf("event-%d", i))
+	}
+}
+
+func TestXSinglePipelineDisruptor_PublishTimeout(t *testing.T) {
+	num := 10
+	disruptor := NewXSinglePipelineDisruptor[string](2,
+		NewXGoSchedBlockStrategy(),
+		func(event string) error {
+			nextInt := rand.Intn(10)
+			if nextInt == 0 {
+				nextInt = 2
+			}
+			time.Sleep(time.Duration(nextInt) * time.Millisecond)
+			slog.Info("handle event details", "name", event)
+			return nil
+		},
+	)
+	if err := disruptor.Start(); err != nil {
+		t.Fatalf("disruptor start failed, err: %v", err)
+	}
+	for i := 0; i < num; i++ {
+		event := fmt.Sprintf("event-%d", i)
+		disruptor.PublishTimeout(event, 5*time.Millisecond)
+	}
+	time.Sleep(500 * time.Millisecond)
 	err := disruptor.Stop()
 	assert.NoError(t, err)
 }

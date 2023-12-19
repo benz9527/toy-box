@@ -76,29 +76,29 @@ func (sub *xSinglePipelineSubscriber[T]) eventsHandle() {
 		if sub.IsStopped() {
 			return
 		}
-		i := int32(0)
+		spinCount := int32(0)
 		for {
 			if sub.IsStopped() {
 				return
 			}
-			if e, exists := sub.rb.LoadElement(readCursor - 1); exists {
+			if e, exists := sub.rb.LoadElement(readCursor); exists {
 				readCursor = sub.seq.NextReadCursor()
 				// FIXME handle error
 				_ = sub.HandleEvent(e.GetValue())
-				i = 0
+				spinCount = 0
 				break
 			} else {
-				if i < sub.spin {
+				if spinCount < sub.spin {
 					procYield(30)
-				} else if i < sub.spin+passiveSpin {
+				} else if spinCount < sub.spin+passiveSpin {
 					runtime.Gosched()
 				} else {
 					sub.strategy.WaitFor(func() bool {
 						return e.GetCursor() == readCursor
 					})
-					i = 0
+					spinCount = 0
 				}
-				i++
+				spinCount++
 			}
 		}
 	}

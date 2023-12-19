@@ -14,7 +14,7 @@ type stopper interface {
 
 type Publisher[T any] interface {
 	Publish(event T) (uint64, bool, error)
-	PublishTimeout(event T, timeout time.Duration) (uint64, bool, error)
+	PublishTimeout(event T, timeout time.Duration)
 }
 
 type Producer[T any] Publisher[T]

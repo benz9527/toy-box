@@ -84,8 +84,8 @@ func (dis *xSinglePipelineDisruptor[T]) Publish(event T) (uint64, bool, error) {
 	return dis.pub.Publish(event)
 }
 
-func (dis *xSinglePipelineDisruptor[T]) PublishTimeout(event T, timeout time.Duration) (uint64, bool, error) {
-	return dis.pub.PublishTimeout(event, timeout)
+func (dis *xSinglePipelineDisruptor[T]) PublishTimeout(event T, timeout time.Duration) {
+	dis.pub.PublishTimeout(event, timeout)
 }
 
 func (dis *xSinglePipelineDisruptor[T]) RegisterSubscriber(sub Subscriber[T]) error {

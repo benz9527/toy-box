@@ -15,7 +15,7 @@ type xSequencer struct {
 func NewXSequencer(capacity uint64) Sequencer {
 	return &xSequencer{
 		capacity:    capacity,
-		readCursor:  1,
+		readCursor:  0,
 		writeCursor: queue.NewXRingBufferCursor(),
 	}
 }

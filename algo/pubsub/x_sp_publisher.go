@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"runtime"
 	"sync/atomic"
 	"time"
@@ -77,31 +78,34 @@ func (pub *xSinglePipelinePublisher[T]) Publish(event T) (uint64, bool, error) {
 	}
 }
 
-func (pub *xSinglePipelinePublisher[T]) PublishTimeout(event T, timeout time.Duration) (uint64, bool, error) {
-	if pub.IsStopped() {
-		return 0, false, fmt.Errorf("publisher closed")
-	}
-	nextCursor := pub.seq.GetWriteCursor().Increase()
-	ok := pub.publishAt(event, nextCursor)
-	if ok {
-		return nextCursor, true, nil
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	for {
-		select {
-		case <-ctx.Done():
-			return 0, false, fmt.Errorf("publish timeout")
-		default:
-			if ok = pub.publishAt(event, nextCursor); ok {
-				return nextCursor, true, nil
+func (pub *xSinglePipelinePublisher[T]) PublishTimeout(event T, timeout time.Duration) {
+	go func() {
+		if pub.IsStopped() {
+			slog.Warn("publisher closed", "event", event)
+			return
+		}
+		nextCursor := pub.seq.GetWriteCursor().Increase()
+		var ok bool
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		for {
+			select {
+			case <-ctx.Done():
+				slog.Warn("publish timeout", "event", event)
+				return
+			default:
+				if ok = pub.publishAt(event, nextCursor-1); ok {
+					slog.Info("publish success", "event", event)
+					return
+				}
 			}
 			runtime.Gosched()
+			if pub.IsStopped() {
+				slog.Warn("publisher closed", "event", event)
+				return
+			}
 		}
-		if pub.IsStopped() {
-			return 0, false, fmt.Errorf("publisher closed")
-		}
-	}
+	}()
 }
 
 // unstable result under concurrent scenario
