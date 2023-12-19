@@ -31,9 +31,8 @@ type Subscriber[T any] interface {
 }
 
 type Sequencer interface {
-	NextReadCursor() uint64
-	LoadReadCursor() uint64
 	Capacity() uint64
+	GetReadCursor() queue.RingBufferCursor
 	GetWriteCursor() queue.RingBufferCursor
 }
 

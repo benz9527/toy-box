@@ -46,11 +46,11 @@ func NewXSleepBlockStrategy(sleepTime time.Duration) BlockStrategy {
 	}
 }
 
-func (x *xSleepBlockStrategy) WaitFor(eqFn func() bool) {
-	time.Sleep(x.sleepTime)
+func (bs *xSleepBlockStrategy) WaitFor(eqFn func() bool) {
+	time.Sleep(bs.sleepTime)
 }
 
-func (x *xSleepBlockStrategy) Done() {
+func (bs *xSleepBlockStrategy) Done() {
 	// do nothing
 }
 
@@ -67,11 +67,11 @@ func NewXCpuNoOpLoopBlockStrategy(cycles uint32) BlockStrategy {
 	}
 }
 
-func (x *xCpuNoOpLoopBlockStrategy) WaitFor(eqFn func() bool) {
-	procYield(x.cycles)
+func (bs *xCpuNoOpLoopBlockStrategy) WaitFor(eqFn func() bool) {
+	procYield(bs.cycles)
 }
 
-func (x *xCpuNoOpLoopBlockStrategy) Done() {}
+func (bs *xCpuNoOpLoopBlockStrategy) Done() {}
 
 //go:linkname osYield runtime.osyield
 func osYield()
@@ -82,11 +82,11 @@ func NewXOsYieldBlockStrategy() BlockStrategy {
 	return &xOsYieldBlockStrategy{}
 }
 
-func (x *xOsYieldBlockStrategy) WaitFor(fn func() bool) {
+func (bs *xOsYieldBlockStrategy) WaitFor(fn func() bool) {
 	osYield()
 }
 
-func (x *xOsYieldBlockStrategy) Done() {}
+func (bs *xOsYieldBlockStrategy) Done() {}
 
 type xNoCacheChannelBlockStrategy struct {
 	ch     chan struct{}
@@ -100,31 +100,29 @@ func NewXNoCacheChannelBlockStrategy() BlockStrategy {
 	}
 }
 
-func (x *xNoCacheChannelBlockStrategy) WaitFor(eqFn func() bool) {
+func (bs *xNoCacheChannelBlockStrategy) WaitFor(eqFn func() bool) {
 	// Try to block
-	if x.status.CompareAndSwap(false, true) {
+	if bs.status.CompareAndSwap(false, true) {
 		// Double check
 		if !eqFn() {
 			// Block, wait for signal
-			<-x.ch
+			<-bs.ch
 		} else {
 			//  Double check failed, reset status
-			if !x.status.CompareAndSwap(true, false) {
+			if !bs.status.CompareAndSwap(true, false) {
 				// Wait for release
-				<-x.ch
+				<-bs.ch
 			}
-			return
 		}
 	}
 }
 
-func (x *xNoCacheChannelBlockStrategy) Done() {
+func (bs *xNoCacheChannelBlockStrategy) Done() {
 	// Release
-	if x.status.CompareAndSwap(true, false) {
+	if bs.status.CompareAndSwap(true, false) {
 		// Send signal
-		x.ch <- struct{}{}
+		bs.ch <- struct{}{}
 	}
-	return
 }
 
 type xCondBlockStrategy struct {
@@ -137,17 +135,17 @@ func NewXCondBlockStrategy() BlockStrategy {
 	}
 }
 
-func (x *xCondBlockStrategy) WaitFor(eqFn func() bool) {
-	x.cond.L.Lock()
-	defer x.cond.L.Unlock()
+func (bs *xCondBlockStrategy) WaitFor(eqFn func() bool) {
+	bs.cond.L.Lock()
+	defer bs.cond.L.Unlock()
 	if eqFn() {
 		return
 	}
-	x.cond.Wait()
+	bs.cond.Wait()
 }
 
-func (x *xCondBlockStrategy) Done() {
-	x.cond.L.Lock()
-	defer x.cond.L.Unlock()
-	x.cond.Broadcast()
+func (bs *xCondBlockStrategy) Done() {
+	bs.cond.L.Lock()
+	defer bs.cond.L.Unlock()
+	bs.cond.Broadcast()
 }

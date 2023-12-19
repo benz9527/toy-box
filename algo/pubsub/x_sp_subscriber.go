@@ -71,7 +71,8 @@ func (sub *xSinglePipelineSubscriber[T]) IsStopped() bool {
 }
 
 func (sub *xSinglePipelineSubscriber[T]) eventsHandle() {
-	readCursor := sub.seq.LoadReadCursor()
+	readCursor := sub.seq.GetReadCursor().AtomicLoad()
+	spin := sub.spin
 	for {
 		if sub.IsStopped() {
 			return
@@ -85,10 +86,12 @@ func (sub *xSinglePipelineSubscriber[T]) eventsHandle() {
 				_ = sub.HandleEvent(e.GetValue())
 				spinCount = 0
 				// FIXME handle error
-				readCursor = sub.seq.NextReadCursor()
+				readCursor = sub.seq.GetReadCursor().Increase()
 				break
 			} else {
-				if spinCount < sub.spin+passiveSpin {
+				if spinCount < spin {
+					procYield(30)
+				} else if spinCount > spin && spinCount < spin+passiveSpin {
 					runtime.Gosched()
 				} else {
 					sub.strategy.WaitFor(func() bool {
@@ -103,7 +106,7 @@ func (sub *xSinglePipelineSubscriber[T]) eventsHandle() {
 }
 
 func (sub *xSinglePipelineSubscriber[T]) HandleEvent(event T) error {
-	defer sub.strategy.Done()
+	//defer sub.strategy.Done() // Slow performance issue
 	err := sub.handler(event)
 	return err
 }

@@ -85,6 +85,7 @@ func TestXSinglePipelineDisruptor(t *testing.T) {
 		{5000, 10000, NewXGoSchedBlockStrategy()},
 		{10000, 10000, NewXGoSchedBlockStrategy()},
 		{5000, 10000, NewXNoCacheChannelBlockStrategy()},
+		{5000, 10000, NewXCondBlockStrategy()},
 	}
 	for _, tc := range testcases {
 		t.Run(fmt.Sprintf("gTotal: %d, tasks: %d", tc.gTotal, tc.tasks), func(t *testing.T) {
