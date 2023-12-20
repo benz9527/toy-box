@@ -1,5 +1,7 @@
 package bitmap
 
+import "bytes"
+
 const (
 	maxBitMapSize = 1 << 32
 )
@@ -13,8 +15,8 @@ func NewX32Bitmap(size uint64) Bitmap {
 	if size <= 0 || size > maxBitMapSize {
 		size = maxBitMapSize
 	}
-	if rest := size & 0x07; rest != 0 {
-		size = size + (8 - rest)
+	if remainder := size & 0x07; remainder != 0 {
+		size = size + (8 - remainder)
 	}
 	return &x32Bitmap{
 		bits: make([]byte, size>>3),
@@ -41,4 +43,12 @@ func (bm *x32Bitmap) GetBit(offset uint64) bool {
 		return false
 	}
 	return bm.bits[idx]>>pos != 0
+}
+
+func (bm *x32Bitmap) GetBits() []byte {
+	return bm.bits
+}
+
+func (bm *x32Bitmap) EqualTo(that Bitmap) bool {
+	return bytes.Compare(bm.GetBits(), that.GetBits()) == 0
 }
