@@ -10,7 +10,10 @@ var (
 )
 
 type xRingBufferElement[T any] struct {
-	cursor uint64 // index of the element in the ring buffer
+	// index of the element in the ring buffer and
+	// it is also the "lock" to protect the value
+	// in lock-free mode by atomic operation
+	cursor uint64
 	value  T
 }
 
@@ -46,8 +49,10 @@ func (rb *xRingBuffer[T]) Capacity() uint64 {
 
 func (rb *xRingBuffer[T]) StoreElement(cursor uint64, value T) {
 	e := rb.buffer[cursor&rb.capacityMask]
-	atomic.StoreUint64(&e.cursor, cursor)
+	// atomic operation should be called at the end of the function
+	// otherwise, the value of cursor may be changed by other goroutines
 	e.value = value
+	atomic.StoreUint64(&e.cursor, cursor)
 }
 
 func (rb *xRingBuffer[T]) LoadElement(cursor uint64) (RingBufferElement[T], bool) {

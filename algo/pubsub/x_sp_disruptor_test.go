@@ -51,12 +51,12 @@ func testXSinglePipelineDisruptor(t *testing.T, gTotal, tasks int, bs BlockStrat
 	}
 	wg := &sync.WaitGroup{}
 	wg.Add(gTotal)
-	disruptor := NewXSinglePipelineDisruptor[int](1024*1024,
+	disruptor := NewXSinglePipelineDisruptor[uint64](1024*1024,
 		bs,
-		func(event int) error {
+		func(event uint64) error {
 			counter.Add(1)
 			if bitmapCheck {
-				bm.SetBit(uint64(event), true)
+				bm.SetBit(event, true)
 			}
 			return nil
 		},
@@ -69,7 +69,7 @@ func testXSinglePipelineDisruptor(t *testing.T, gTotal, tasks int, bs BlockStrat
 		go func(idx int) {
 			defer wg.Done()
 			for j := 0; j < tasks; j++ {
-				if _, _, err := disruptor.Publish(idx*tasks + j); err != nil {
+				if _, _, err := disruptor.Publish(uint64(idx*tasks + j)); err != nil {
 					t.Logf("publish failed, err: %v", err)
 					break
 				} else {
@@ -103,21 +103,22 @@ func testXSinglePipelineDisruptor(t *testing.T, gTotal, tasks int, bs BlockStrat
 
 func TestXSinglePipelineDisruptor(t *testing.T) {
 	testcases := []struct {
+		name   string
 		gTotal int
 		tasks  int
 		bs     BlockStrategy
 	}{
-		{10, 100, NewXGoSchedBlockStrategy()},
-		{100, 10000, NewXGoSchedBlockStrategy()},
-		{500, 10000, NewXGoSchedBlockStrategy()},
-		{1000, 10000, NewXGoSchedBlockStrategy()},
-		{5000, 10000, NewXGoSchedBlockStrategy()},
-		{10000, 10000, NewXGoSchedBlockStrategy()},
-		{5000, 10000, NewXNoCacheChannelBlockStrategy()},
-		{5000, 10000, NewXCondBlockStrategy()},
+		{"gosched 10*100", 10, 100, NewXGoSchedBlockStrategy()},
+		{"gosched 100*10000", 100, 10000, NewXGoSchedBlockStrategy()},
+		{"gosched 500*10000", 500, 10000, NewXGoSchedBlockStrategy()},
+		{"gosched 1000*10000", 1000, 10000, NewXGoSchedBlockStrategy()},
+		{"gosched 5000*10000", 5000, 10000, NewXGoSchedBlockStrategy()},
+		{"gosched 10000*10000", 10000, 10000, NewXGoSchedBlockStrategy()},
+		{"nochan 5000*10000", 5000, 10000, NewXNoCacheChannelBlockStrategy()},
+		{"cond 5000*10000", 5000, 10000, NewXCondBlockStrategy()},
 	}
 	for _, tc := range testcases {
-		t.Run(fmt.Sprintf("gTotal: %d, tasks: %d", tc.gTotal, tc.tasks), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			testXSinglePipelineDisruptor(t, tc.gTotal, tc.tasks, tc.bs, false)
 		})
 	}
@@ -125,21 +126,22 @@ func TestXSinglePipelineDisruptor(t *testing.T) {
 
 func TestXSinglePipelineDisruptorWithBitmapCheck(t *testing.T) {
 	testcases := []struct {
+		name   string
 		gTotal int
 		tasks  int
 		bs     BlockStrategy
 	}{
-		{10, 100, NewXGoSchedBlockStrategy()},
-		{100, 10000, NewXGoSchedBlockStrategy()},
-		{500, 10000, NewXGoSchedBlockStrategy()},
-		{1000, 10000, NewXGoSchedBlockStrategy()},
-		{5000, 10000, NewXGoSchedBlockStrategy()},
-		{10000, 10000, NewXGoSchedBlockStrategy()},
-		{5000, 10000, NewXNoCacheChannelBlockStrategy()},
-		{5000, 10000, NewXCondBlockStrategy()},
+		{"gosched 10*100", 10, 100, NewXGoSchedBlockStrategy()},
+		{"gosched 100*10000", 100, 10000, NewXGoSchedBlockStrategy()},
+		{"gosched 500*10000", 500, 10000, NewXGoSchedBlockStrategy()},
+		{"gosched 1000*10000", 1000, 10000, NewXGoSchedBlockStrategy()},
+		{"gosched 5000*10000", 5000, 10000, NewXGoSchedBlockStrategy()},
+		{"gosched 10000*10000", 10000, 10000, NewXGoSchedBlockStrategy()},
+		{"nochan 5000*10000", 5000, 10000, NewXNoCacheChannelBlockStrategy()},
+		{"cond 5000*10000", 5000, 10000, NewXCondBlockStrategy()},
 	}
 	for _, tc := range testcases {
-		t.Run(fmt.Sprintf("gTotal: %d, tasks: %d", tc.gTotal, tc.tasks), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			testXSinglePipelineDisruptor(t, tc.gTotal, tc.tasks, tc.bs, true)
 		})
 	}
