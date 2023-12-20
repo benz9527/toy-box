@@ -180,17 +180,19 @@ func testNoCacheChannel(t *testing.T, chSize, gTotal, tasks int) {
 
 func TestNoCacheChannel(t *testing.T) {
 	testcases := []struct {
+		name   string
 		gTotal int
 		tasks  int
 	}{
-		{100, 10000},
-		{500, 10000},
-		{1000, 10000},
-		{5000, 10000},
-		{10000, 10000},
+		{"nochan 10*100", 10, 100},
+		{"nochan 100*10000", 100, 10000},
+		{"nochan 500*10000", 500, 10000},
+		{"nochan 1000*10000", 1000, 10000},
+		{"nochan 5000*10000", 5000, 10000},
+		{"nochan 10000*10000", 10000, 10000},
 	}
 	for _, tc := range testcases {
-		t.Run(fmt.Sprintf("gTotal: %d, tasks: %d", tc.gTotal, tc.tasks), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			testNoCacheChannel(t, 0, tc.gTotal, tc.tasks)
 		})
 	}
@@ -198,17 +200,19 @@ func TestNoCacheChannel(t *testing.T) {
 
 func TestCacheChannel(t *testing.T) {
 	testcases := []struct {
+		name   string
 		gTotal int
 		tasks  int
 	}{
-		{100, 10000},
-		{500, 10000},
-		{1000, 10000},
-		{5000, 10000},
-		{10000, 10000},
+		{"cachechan 10*100", 10, 100},
+		{"cachechan 100*10000", 100, 10000},
+		{"cachechan 500*10000", 500, 10000},
+		{"cachechan 1000*10000", 1000, 10000},
+		{"cachechan 5000*10000", 5000, 10000},
+		{"cachechan 10000*10000", 10000, 10000},
 	}
 	for _, tc := range testcases {
-		t.Run(fmt.Sprintf("gTotal: %d, tasks: %d", tc.gTotal, tc.tasks), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			testNoCacheChannel(t, 1024*1024, tc.gTotal, tc.tasks)
 		})
 	}
