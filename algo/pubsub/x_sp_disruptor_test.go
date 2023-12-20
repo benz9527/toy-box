@@ -1,7 +1,9 @@
 package pubsub
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/benz9527/toy-box/algo/bitmap"
 	"github.com/stretchr/testify/assert"
 	"log/slog"
 	"math/rand"
@@ -37,14 +39,25 @@ func TestCeilCapacity(t *testing.T) {
 	}
 }
 
-func testXSinglePipelineDisruptor(t *testing.T, gTotal, tasks int, bs BlockStrategy) {
-	counter := &atomic.Int64{}
+func testXSinglePipelineDisruptor(t *testing.T, gTotal, tasks int, bs BlockStrategy, bitmapCheck bool) {
+	var (
+		counter = &atomic.Int64{}
+		bm      bitmap.Bitmap
+		checkBM bitmap.Bitmap
+	)
+	if bitmapCheck {
+		bm = bitmap.NewX32Bitmap(uint64(gTotal * tasks))
+		checkBM = bitmap.NewX32Bitmap(uint64(gTotal * tasks))
+	}
 	wg := &sync.WaitGroup{}
 	wg.Add(gTotal)
 	disruptor := NewXSinglePipelineDisruptor[int](1024*1024,
 		bs,
 		func(event int) error {
 			counter.Add(1)
+			if bitmapCheck {
+				bm.SetBit(uint64(event), true)
+			}
 			return nil
 		},
 	)
@@ -53,15 +66,19 @@ func testXSinglePipelineDisruptor(t *testing.T, gTotal, tasks int, bs BlockStrat
 	}
 	beginTs := time.Now()
 	for i := 0; i < gTotal; i++ {
-		go func() {
+		go func(idx int) {
 			defer wg.Done()
 			for j := 0; j < tasks; j++ {
-				if _, _, err := disruptor.Publish(j); err != nil {
+				if _, _, err := disruptor.Publish(idx*tasks + j); err != nil {
 					t.Logf("publish failed, err: %v", err)
 					break
+				} else {
+					if bitmapCheck {
+						checkBM.SetBit(uint64(idx*tasks+j), true)
+					}
 				}
 			}
-		}()
+		}(i)
 	}
 	wg.Wait()
 	diff := time.Now().Sub(beginTs)
@@ -70,6 +87,18 @@ func testXSinglePipelineDisruptor(t *testing.T, gTotal, tasks int, bs BlockStrat
 	assert.Equal(t, int64(gTotal*tasks), counter.Load())
 	err := disruptor.Stop()
 	assert.NoError(t, err)
+	if bitmapCheck {
+		if !bm.EqualTo(checkBM) {
+			bm1bits := bm.GetBits()
+			bm2bits := checkBM.GetBits()
+			for i := 0; i < len(bm1bits); i++ {
+				if bytes.Compare(bm1bits[i:i+1], bm2bits[i:i+1]) != 0 {
+					t.Logf("idx: %d, bm1: %08b, bm2: %08b", i, bm1bits[i:i+1], bm2bits[i:i+1])
+				}
+			}
+			t.FailNow()
+		}
+	}
 }
 
 func TestXSinglePipelineDisruptor(t *testing.T) {
@@ -89,7 +118,29 @@ func TestXSinglePipelineDisruptor(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(fmt.Sprintf("gTotal: %d, tasks: %d", tc.gTotal, tc.tasks), func(t *testing.T) {
-			testXSinglePipelineDisruptor(t, tc.gTotal, tc.tasks, tc.bs)
+			testXSinglePipelineDisruptor(t, tc.gTotal, tc.tasks, tc.bs, false)
+		})
+	}
+}
+
+func TestXSinglePipelineDisruptorWithBitmapCheck(t *testing.T) {
+	testcases := []struct {
+		gTotal int
+		tasks  int
+		bs     BlockStrategy
+	}{
+		{10, 100, NewXGoSchedBlockStrategy()},
+		{100, 10000, NewXGoSchedBlockStrategy()},
+		{500, 10000, NewXGoSchedBlockStrategy()},
+		{1000, 10000, NewXGoSchedBlockStrategy()},
+		{5000, 10000, NewXGoSchedBlockStrategy()},
+		{10000, 10000, NewXGoSchedBlockStrategy()},
+		{5000, 10000, NewXNoCacheChannelBlockStrategy()},
+		{5000, 10000, NewXCondBlockStrategy()},
+	}
+	for _, tc := range testcases {
+		t.Run(fmt.Sprintf("gTotal: %d, tasks: %d", tc.gTotal, tc.tasks), func(t *testing.T) {
+			testXSinglePipelineDisruptor(t, tc.gTotal, tc.tasks, tc.bs, true)
 		})
 	}
 }
