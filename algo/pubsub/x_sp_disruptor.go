@@ -34,7 +34,7 @@ func NewXSinglePipelineDisruptor[T any](
 	handler EventHandler[T],
 ) Disruptor[T] {
 	capacity = ceilCapacity(capacity)
-	seq := NewXSequencer(capacity)
+	seq := NewXBasicSequencer(capacity)
 	rb := queue.NewXRingBuffer[T](capacity)
 	pub := newXSinglePipelinePublisher[T](seq, rb, strategy)
 	sub := newXSinglePipelineSubscriber[T](rb, handler, seq, strategy)

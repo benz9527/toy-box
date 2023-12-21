@@ -65,8 +65,7 @@ func (pub *xSinglePipelinePublisher[T]) Publish(event T) (uint64, bool, error) {
 	}
 	nextWriteCursor := pub.seq.GetWriteCursor().Increase()
 	for {
-		readCursor := pub.seq.GetReadCursor().AtomicLoad() - 1
-		if nextWriteCursor <= readCursor+pub.capacity {
+		if nextWriteCursor < pub.seq.GetReadCursor().AtomicLoad()+pub.capacity {
 			pub.rb.StoreElement(nextWriteCursor-1, event)
 			pub.strategy.Done()
 			return nextWriteCursor, true, nil
@@ -94,7 +93,7 @@ func (pub *xSinglePipelinePublisher[T]) PublishTimeout(event T, timeout time.Dur
 				slog.Warn("publish timeout", "event", event)
 				return
 			default:
-				if ok = pub.publishAt(event, nextCursor-1); ok {
+				if ok = pub.publishAt(event, nextCursor); ok {
 					slog.Info("publish success", "event", event)
 					return
 				}

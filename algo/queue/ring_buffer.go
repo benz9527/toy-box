@@ -2,7 +2,9 @@
 
 package queue
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+)
 
 var (
 	_ RingBufferElement[struct{}] = (*xRingBufferElement[struct{}])(nil)
@@ -48,7 +50,7 @@ func (rb *xRingBuffer[T]) Capacity() uint64 {
 }
 
 func (rb *xRingBuffer[T]) StoreElement(cursor uint64, value T) {
-	e := rb.buffer[cursor&rb.capacityMask]
+	e := rb.buffer[cursor&rb.capacityMask] // get remainder
 	// atomic operation should be called at the end of the function
 	// otherwise, the value of cursor may be changed by other goroutines
 	e.value = value

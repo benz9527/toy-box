@@ -54,10 +54,10 @@ func testXSinglePipelineDisruptor(t *testing.T, gTotal, tasks int, bs BlockStrat
 	disruptor := NewXSinglePipelineDisruptor[uint64](1024*1024,
 		bs,
 		func(event uint64) error {
-			counter.Add(1)
 			if bitmapCheck {
 				bm.SetBit(event, true)
 			}
+			counter.Add(1)
 			return nil
 		},
 	)
@@ -69,13 +69,12 @@ func testXSinglePipelineDisruptor(t *testing.T, gTotal, tasks int, bs BlockStrat
 		go func(idx int) {
 			defer wg.Done()
 			for j := 0; j < tasks; j++ {
+				if bitmapCheck {
+					checkBM.SetBit(uint64(idx*tasks+j), true)
+				}
 				if _, _, err := disruptor.Publish(uint64(idx*tasks + j)); err != nil {
 					t.Logf("publish failed, err: %v", err)
 					break
-				} else {
-					if bitmapCheck {
-						checkBM.SetBit(uint64(idx*tasks+j), true)
-					}
 				}
 			}
 		}(i)
@@ -116,6 +115,9 @@ func TestXSinglePipelineDisruptor(t *testing.T) {
 		{"gosched 10000*10000", 10000, 10000, NewXGoSchedBlockStrategy()},
 		{"nochan 5000*10000", 5000, 10000, NewXNoCacheChannelBlockStrategy()},
 		{"cond 5000*10000", 5000, 10000, NewXCondBlockStrategy()},
+		{"sleep1ms 5000*10000", 5000, 10000, NewXSleepBlockStrategy(1 * time.Millisecond)},
+		{"cpunoop10 5000*10000", 5000, 10000, NewXCpuNoOpLoopBlockStrategy(10)}, // will overlap
+		{"osyield 5000*10000", 5000, 10000, NewXOsYieldBlockStrategy()},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -133,12 +135,16 @@ func TestXSinglePipelineDisruptorWithBitmapCheck(t *testing.T) {
 	}{
 		{"gosched 10*100", 10, 100, NewXGoSchedBlockStrategy()},
 		{"gosched 100*10000", 100, 10000, NewXGoSchedBlockStrategy()},
+		{"gosched 1*1000000", 1, 1000000, NewXGoSchedBlockStrategy()},
 		{"gosched 500*10000", 500, 10000, NewXGoSchedBlockStrategy()},
 		{"gosched 1000*10000", 1000, 10000, NewXGoSchedBlockStrategy()},
 		{"gosched 5000*10000", 5000, 10000, NewXGoSchedBlockStrategy()},
 		{"gosched 10000*10000", 10000, 10000, NewXGoSchedBlockStrategy()},
 		{"nochan 5000*10000", 5000, 10000, NewXNoCacheChannelBlockStrategy()},
 		{"cond 5000*10000", 5000, 10000, NewXCondBlockStrategy()},
+		{"sleep1ms 5000*10000", 5000, 10000, NewXSleepBlockStrategy(1 * time.Millisecond)},
+		{"cpunoop10 5000*10000", 5000, 10000, NewXCpuNoOpLoopBlockStrategy(10)}, // will overlap
+		{"osyield 5000*10000", 5000, 10000, NewXOsYieldBlockStrategy()},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {

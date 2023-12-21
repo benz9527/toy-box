@@ -36,6 +36,14 @@ type Sequencer interface {
 	GetWriteCursor() queue.RingBufferCursor
 }
 
+type ProducerSequencer interface {
+	Next() uint64
+	NextN(n uint64) uint64
+	Update(next uint64)
+	AddGatingConsumerCursors(cursors ...queue.RingBufferCursor)
+	RemoveGatingConsumerCursor(cursor queue.RingBufferCursor) bool
+}
+
 type Disruptor[T any] interface {
 	Publisher[T]
 	stopper
