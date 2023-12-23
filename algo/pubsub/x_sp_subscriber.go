@@ -91,11 +91,11 @@ func (sub *xSinglePipelineSubscriber[T]) eventsHandle() {
 			} else {
 				if spinCount < spin {
 					procYield(30)
-				} else if spinCount > spin && spinCount < spin+passiveSpin {
+				} else if spinCount < spin+passiveSpin {
 					runtime.Gosched()
 				} else {
 					sub.strategy.WaitFor(func() bool {
-						return readCursor < sub.seq.GetWriteCursor().AtomicLoad()
+						return e.GetCursor() == readCursor
 					})
 					spinCount = 0
 				}

@@ -52,3 +52,7 @@ func (bm *x32Bitmap) GetBits() []byte {
 func (bm *x32Bitmap) EqualTo(that Bitmap) bool {
 	return bytes.Compare(bm.GetBits(), that.GetBits()) == 0
 }
+
+func (bm *x32Bitmap) Free() {
+	clear(bm.bits)
+}

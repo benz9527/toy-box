@@ -25,6 +25,7 @@ type xSinglePipelineDisruptor[T any] struct {
 		Subscriber[T]
 		stopper
 	}
+	rbuf   queue.RingBuffer[T]
 	status disruptorStatus
 }
 
@@ -41,6 +42,7 @@ func NewXSinglePipelineDisruptor[T any](
 	d := &xSinglePipelineDisruptor[T]{
 		pub:    pub,
 		sub:    sub,
+		rbuf:   rb,
 		status: disruptorReady,
 	}
 	return d
@@ -71,6 +73,7 @@ func (dis *xSinglePipelineDisruptor[T]) Stop() error {
 			atomic.CompareAndSwapInt32((*int32)(&dis.status), int32(disruptorRunning), int32(disruptorReady))
 			return err
 		}
+		dis.rbuf.Free()
 		return nil
 	}
 	return fmt.Errorf("disruptor already stopped")

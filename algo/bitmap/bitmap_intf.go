@@ -5,4 +5,5 @@ type Bitmap interface {
 	GetBit(offset uint64) bool
 	GetBits() []byte
 	EqualTo(bm Bitmap) bool
+	Free()
 }
