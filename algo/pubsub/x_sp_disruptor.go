@@ -73,7 +73,7 @@ func (dis *xSinglePipelineDisruptor[T]) Stop() error {
 			atomic.CompareAndSwapInt32((*int32)(&dis.status), int32(disruptorRunning), int32(disruptorReady))
 			return err
 		}
-		dis.rbuf.Free()
+		//dis.rbuf.Free()
 		return nil
 	}
 	return fmt.Errorf("disruptor already stopped")

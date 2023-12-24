@@ -298,52 +298,72 @@ func TestXSinglePipelineDisruptorWithBitmapCheckAndReport(t *testing.T) {
 		tasks    int
 		capacity uint64
 		bs       BlockStrategy
-		isStr    bool
 	}{
-		{"gosched 1*100000", 1000, 1, 10000, 1024, NewXGoSchedBlockStrategy(), false},
-		{"gosched 10*100", 1000, 10, 100, 512, NewXGoSchedBlockStrategy(), false},
-		{"gosched 10*100", 1000, 10, 100, 1024, NewXGoSchedBlockStrategy(), false},
-		{"gosched 100*10000", 200, 100, 10000, 1024 * 1024, NewXGoSchedBlockStrategy(), false},
-		{"gosched 500*10000", 10, 500, 10000, 1024 * 1024, NewXGoSchedBlockStrategy(), false},
-		{"gosched 1000*10000", 10, 1000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy(), false},
-		{"gosched 5000*10000", 10, 5000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy(), false},
-		{"gosched 10000*10000", 5, 10000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy(), false},
-		{"gosched 1*100000", 1000, 1, 10000, 1024, NewXNoCacheChannelBlockStrategy(), false},
-		{"gosched 10*100", 1000, 10, 100, 512, NewXNoCacheChannelBlockStrategy(), false},
-		{"gosched 10*100", 1000, 10, 100, 1024, NewXNoCacheChannelBlockStrategy(), false},
-		{"gosched 100*10000", 200, 100, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy(), false},
-		{"gosched 500*10000", 10, 500, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy(), false},
-		{"gosched 1000*10000", 10, 1000, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy(), false},
-		{"gosched 5000*10000", 10, 5000, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy(), false},
-		{"gosched 10000*10000", 5, 10000, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy(), false},
-
-		{"gosched 1*100000", 1000, 1, 10000, 1024, NewXGoSchedBlockStrategy(), true},
-		{"gosched 10*100", 1000, 10, 100, 512, NewXGoSchedBlockStrategy(), true},
-		{"gosched 10*100", 1000, 10, 100, 1024, NewXGoSchedBlockStrategy(), true},
-		{"gosched 100*10000", 1000, 100, 10000, 1024 * 1024, NewXGoSchedBlockStrategy(), true},
-		{"gosched 500*10000", 100, 500, 10000, 1024 * 1024, NewXGoSchedBlockStrategy(), true},
-		{"gosched 1000*10000", 10, 1000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy(), true},
-		{"gosched 5000*10000", 10, 5000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy(), true},
-		{"gosched 10000*10000", 5, 10000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy(), true},
-		{"gosched 1*100000", 1000, 1, 10000, 1024, NewXNoCacheChannelBlockStrategy(), true},
-		{"gosched 10*100", 1000, 10, 100, 512, NewXNoCacheChannelBlockStrategy(), true},
-		{"gosched 10*100", 1000, 10, 100, 1024, NewXNoCacheChannelBlockStrategy(), true},
-		{"gosched 100*10000", 1000, 100, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy(), true},
-		{"gosched 500*10000", 10, 500, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy(), true},
-		{"gosched 1000*10000", 10, 1000, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy(), true},
-		{"gosched 5000*10000", 10, 5000, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy(), true},
-		{"gosched 10000*10000", 5, 10000, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy(), true},
+		{"gosched 1*10000", 1000, 1, 10000, 1024, NewXGoSchedBlockStrategy()},
+		{"gosched 10*100", 1000, 10, 100, 512, NewXGoSchedBlockStrategy()},
+		{"gosched 10*100", 1000, 10, 100, 1024, NewXGoSchedBlockStrategy()},
+		{"gosched 100*10000", 200, 100, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
+		{"gosched 500*10000", 10, 500, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
+		{"gosched 1000*10000", 10, 1000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
+		{"gosched 5000*10000", 10, 5000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
+		{"gosched 10000*10000", 5, 10000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
+		{"nochan 1*10000", 1000, 1, 10000, 1024, NewXNoCacheChannelBlockStrategy()},
+		{"nochan 10*100", 1000, 10, 100, 512, NewXNoCacheChannelBlockStrategy()},
+		{"nochan 10*100", 1000, 10, 100, 1024, NewXNoCacheChannelBlockStrategy()},
+		{"nochan 100*10000", 200, 100, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy()},
+		{"nochan 500*10000", 10, 500, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy()},
+		{"nochan 1000*10000", 10, 1000, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy()},
+		{"nochan 5000*10000", 10, 5000, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy()},
+		{"nochan 10000*10000", 5, 10000, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy()},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			for i := 0; i < tc.loop; i++ {
-				if !tc.isStr {
-					_, _ = reportFile.WriteString(fmt.Sprintf("\n====== begin uint64 report(%s, %d) ======\n", tc.name, i))
-					testXSinglePipelineDisruptorUint64(t, tc.gTotal, tc.tasks, tc.capacity, tc.bs, true, reportFile)
-				} else {
-					_, _ = reportFile.WriteString(fmt.Sprintf("\n====== begin string report(%s, %d) ======\n", tc.name, i))
-					testXSinglePipelineDisruptorString(t, tc.gTotal, tc.tasks, tc.capacity, tc.bs, true, reportFile)
-				}
+				_, _ = reportFile.WriteString(fmt.Sprintf("\n====== begin uint64 report(%s, %d) ======\n", tc.name, i))
+				testXSinglePipelineDisruptorUint64(t, tc.gTotal, tc.tasks, tc.capacity, tc.bs, true, reportFile)
+			}
+		})
+	}
+}
+
+func TestXSinglePipelineDisruptorWithBitmapCheckAndReport_str(t *testing.T) {
+	reportFile, err := os.OpenFile(filepath.Join(os.TempDir(), "pubsub-report-str-"+time.Now().Format(time.RFC3339)+".txt"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	defer func() {
+		if reportFile != nil {
+			_ = reportFile.Close()
+		}
+	}()
+	assert.NoError(t, err)
+	testcases := []struct {
+		name     string
+		loop     int
+		gTotal   int
+		tasks    int
+		capacity uint64
+		bs       BlockStrategy
+	}{
+		{"gosched 1*10000 str", 1000, 1, 10000, 1024, NewXGoSchedBlockStrategy()},
+		{"gosched 10*100 str", 1000, 10, 100, 512, NewXGoSchedBlockStrategy()},
+		{"gosched 10*100 str", 1000, 10, 100, 1024, NewXGoSchedBlockStrategy()},
+		{"gosched 100*10000 str", 1000, 100, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
+		{"gosched 500*10000 str", 100, 500, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
+		{"gosched 1000*10000 str", 10, 1000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
+		{"gosched 5000*10000 str", 10, 5000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
+		{"gosched 10000*10000 str", 5, 10000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
+		{"nochan 1*10000 str", 1000, 1, 10000, 1024, NewXNoCacheChannelBlockStrategy()},
+		{"nochan 10*100 str", 1000, 10, 100, 512, NewXNoCacheChannelBlockStrategy()},
+		{"nochan 10*100 str", 1000, 10, 100, 1024, NewXNoCacheChannelBlockStrategy()},
+		{"nochan 100*10000 str", 1000, 100, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy()},
+		{"nochan 500*10000 str", 10, 500, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy()},
+		{"nochan 1000*10000 str", 10, 1000, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy()},
+		{"nochan 5000*10000 str", 10, 5000, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy()},
+		{"nochan 10000*10000 str", 5, 10000, 10000, 1024 * 1024, NewXNoCacheChannelBlockStrategy()},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			for i := 0; i < tc.loop; i++ {
+				_, _ = reportFile.WriteString(fmt.Sprintf("\n====== begin string report(%s, %d) ======\n", tc.name, i))
+				testXSinglePipelineDisruptorString(t, tc.gTotal, tc.tasks, tc.capacity, tc.bs, true, reportFile)
 			}
 		})
 	}
