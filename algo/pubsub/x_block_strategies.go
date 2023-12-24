@@ -1,10 +1,12 @@
 package pubsub
 
 import (
+	"github.com/benz9527/toy-box/algo/queue"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 	_ "unsafe"
 )
 
@@ -13,7 +15,7 @@ var (
 	_ BlockStrategy = (*xSleepBlockStrategy)(nil)
 	_ BlockStrategy = (*xCpuNoOpLoopBlockStrategy)(nil)
 	_ BlockStrategy = (*xOsYieldBlockStrategy)(nil)
-	_ BlockStrategy = (*xNoCacheChannelBlockStrategy)(nil)
+	_ BlockStrategy = (*xCacheChannelBlockStrategy)(nil)
 	_ BlockStrategy = (*xCondBlockStrategy)(nil)
 )
 
@@ -88,28 +90,30 @@ func (bs *xOsYieldBlockStrategy) WaitFor(fn func() bool) {
 
 func (bs *xOsYieldBlockStrategy) Done() {}
 
-type xNoCacheChannelBlockStrategy struct {
+type xCacheChannelBlockStrategy struct {
+	_      [queue.CacheLinePadSize - unsafe.Sizeof(*new(uint64))]byte
+	status uint64
+	_      [queue.CacheLinePadSize - unsafe.Sizeof(*new(uint64))]byte
 	ch     chan struct{}
-	status *atomic.Bool
 }
 
-func NewXNoCacheChannelBlockStrategy() BlockStrategy {
-	return &xNoCacheChannelBlockStrategy{
-		ch:     make(chan struct{}),
-		status: &atomic.Bool{},
+func NewXCacheChannelBlockStrategy() BlockStrategy {
+	return &xCacheChannelBlockStrategy{
+		ch:     make(chan struct{}, 1),
+		status: 0,
 	}
 }
 
-func (bs *xNoCacheChannelBlockStrategy) WaitFor(eqFn func() bool) {
+func (bs *xCacheChannelBlockStrategy) WaitFor(eqFn func() bool) {
 	// Try to block
-	if bs.status.CompareAndSwap(false, true) {
+	if atomic.CompareAndSwapUint64(&bs.status, 0, 1) {
 		// Double check
 		if !eqFn() {
 			// Block, wait for signal
 			<-bs.ch
 		} else {
 			//  Double check failed, reset status
-			if !bs.status.CompareAndSwap(true, false) {
+			if !atomic.CompareAndSwapUint64(&bs.status, 1, 0) {
 				// Wait for release
 				<-bs.ch
 			}
@@ -117,9 +121,9 @@ func (bs *xNoCacheChannelBlockStrategy) WaitFor(eqFn func() bool) {
 	}
 }
 
-func (bs *xNoCacheChannelBlockStrategy) Done() {
+func (bs *xCacheChannelBlockStrategy) Done() {
 	// Release
-	if bs.status.CompareAndSwap(true, false) {
+	if atomic.CompareAndSwapUint64(&bs.status, 1, 0) {
 		// Send signal
 		bs.ch <- struct{}{}
 	}
@@ -145,7 +149,5 @@ func (bs *xCondBlockStrategy) WaitFor(eqFn func() bool) {
 }
 
 func (bs *xCondBlockStrategy) Done() {
-	bs.cond.L.Lock()
-	defer bs.cond.L.Unlock()
 	bs.cond.Broadcast()
 }

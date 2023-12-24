@@ -36,6 +36,9 @@ func NewXSinglePipelineDisruptor[T any](
 ) Disruptor[T] {
 	capacity = ceilCapacity(capacity)
 	seq := NewXSequencer(capacity)
+	// Can't start from 0, because 0 will be treated as nil value
+	seq.GetWriteCursor().Increase()
+	seq.GetReadCursor().Increase()
 	rb := queue.NewXRingBuffer[T](capacity)
 	pub := newXSinglePipelinePublisher[T](seq, rb, strategy)
 	sub := newXSinglePipelineSubscriber[T](rb, handler, seq, strategy)

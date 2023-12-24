@@ -65,11 +65,13 @@ func (pub *xSinglePipelinePublisher[T]) Publish(event T) (uint64, bool, error) {
 	}
 	nextWriteCursor := pub.seq.GetWriteCursor().Increase()
 	for {
-		readCursor := pub.seq.GetReadCursor().Load() - 1
-		if nextWriteCursor <= readCursor+pub.capacity {
+		readCursor := pub.seq.GetReadCursor().Load()
+		if nextWriteCursor-readCursor <= pub.capacity {
 			pub.rb.StoreElement(nextWriteCursor-1, event)
 			pub.strategy.Done()
 			return nextWriteCursor - 1, true, nil
+		} else {
+			pub.strategy.Done()
 		}
 		runtime.Gosched()
 		if pub.IsStopped() {

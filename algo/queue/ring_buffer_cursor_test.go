@@ -148,7 +148,7 @@ func TestNoFalseSharing(t *testing.T) {
 	type padE struct {
 		value uint64
 		//_     [7]uint64
-		_ [cacheLinePadSize - unsafe.Sizeof(*new(uint64))]byte
+		_ [CacheLinePadSize - unsafe.Sizeof(*new(uint64))]byte
 	}
 
 	// Each one in a different cache line

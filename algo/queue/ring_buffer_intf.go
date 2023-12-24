@@ -3,7 +3,6 @@ package queue
 type RingBufferElement[T any] interface {
 	GetValue() T
 	GetCursor() uint64
-	IsAllocated(cursor uint64) bool
 }
 
 type RingBuffer[T any] interface {
