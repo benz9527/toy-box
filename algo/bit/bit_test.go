@@ -5,15 +5,26 @@ import (
 	"testing"
 )
 
-func TestGetCeilPowerOfTwo(t *testing.T) {
-	n := GetCeilPowerOfTwo(7)
-	assert.Equal(t, uint64(8), n)
+func TestRoundupPowOf2(t *testing.T) {
+	n := RoundupPowOf2(7)
+	assert.Equal(t, RoundupPowOf2ByCeil(7), n)
 
-	n = GetCeilPowerOfTwo(10)
-	assert.Equal(t, uint64(16), n)
+	n = RoundupPowOf2(10)
+	assert.Equal(t, RoundupPowOf2ByCeil(10), n)
 
-	n = GetCeilPowerOfTwo(17)
-	assert.Equal(t, uint64(32), n)
+	n = RoundupPowOf2(17)
+	assert.Equal(t, RoundupPowOf2ByCeil(17), n)
+}
+
+func TestCeilPowOf2(t *testing.T) {
+	n := CeilPowOf2(7)
+	assert.Equal(t, uint8(3), n)
+
+	n = CeilPowOf2(10)
+	assert.Equal(t, uint8(4), n)
+
+	n = CeilPowOf2(17)
+	assert.Equal(t, uint8(5), n)
 }
 
 func TestHammingWeight(t *testing.T) {

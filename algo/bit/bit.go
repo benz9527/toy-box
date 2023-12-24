@@ -1,6 +1,6 @@
 package bit
 
-func GetCeilPowerOfTwo(target uint64) uint64 {
+func RoundupPowOf2(target uint64) uint64 {
 	target--
 	target |= target >> 1
 	target |= target >> 2
@@ -10,6 +10,52 @@ func GetCeilPowerOfTwo(target uint64) uint64 {
 	target |= target >> 32
 	target++
 	return target
+}
+
+// RoundupPowOf2ByCeil rounds up the target to the power of 2.
+// Copy from linux kernel kfifo.
+func RoundupPowOf2ByCeil(target uint64) uint64 {
+	return 1 << CeilPowOf2(target)
+}
+
+// CeilPowOf2 get the ceil power of 2 of the target.
+// Copy from linux kernel kfifo.
+func CeilPowOf2(target uint64) uint8 {
+	target--
+	if target == 0 {
+		return 0
+	}
+	var pos uint8 = 64
+	if target&0xffffffff00000000 == 0 {
+		target = target << 32
+		pos -= 32
+	}
+	if target&0xffff000000000000 == 0 {
+		target <<= 16
+		pos -= 16
+	}
+	if target&0xff00000000000000 == 0 {
+		target <<= 8
+		pos -= 8
+	}
+	if target&0xf000000000000000 == 0 {
+		target <<= 4
+		pos -= 4
+	}
+	if target&0xc000000000000000 == 0 {
+		target <<= 2
+		pos -= 2
+	}
+	if target&0x8000000000000000 == 0 {
+		pos -= 1
+	}
+	return pos
+}
+
+// IsPowOf2 checks if the target is power of 2.
+// Copy from linux kernel kfifo.
+func IsPowOf2(target uint64) bool {
+	return target&(target-1) == 0
 }
 
 type OneBits interface {
