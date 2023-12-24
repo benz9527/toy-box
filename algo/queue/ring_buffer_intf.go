@@ -15,6 +15,6 @@ type RingBuffer[T any] interface {
 
 type RingBufferCursor interface {
 	Increase() uint64
-	AtomicLoad() uint64
-	CASStore(old, new uint64) bool
+	Load() uint64
+	CAS(old, new uint64) bool
 }

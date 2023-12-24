@@ -2,7 +2,10 @@
 
 package queue
 
+// circular queue
+
 import (
+	"github.com/benz9527/toy-box/algo/bit"
 	"runtime"
 	"sync/atomic"
 )
@@ -40,6 +43,16 @@ type xRingBuffer[T any] struct {
 }
 
 func NewXRingBuffer[T any](capacity uint64) RingBuffer[T] {
+	if capacity > 100*1024*1024 {
+		panic("capacity is too large")
+	}
+	if bit.IsPowOf2(capacity) {
+		capacity = bit.RoundupPowOf2ByCeil(capacity)
+		if capacity > 100*1024*1024 {
+			panic("capacity is too large")
+		}
+	}
+
 	rb := &xRingBuffer[T]{
 		capacityMask: capacity - 1,
 		buffer:       make([]*xRingBufferElement[T], capacity),
@@ -78,6 +91,7 @@ func (rb *xRingBuffer[T]) StoreElement(cursor uint64, value T) {
 }
 
 func (rb *xRingBuffer[T]) LoadElement(cursor uint64) (RingBufferElement[T], bool) {
+
 	e := rb.buffer[cursor&rb.capacityMask]
 	if e != nil && e.IsAllocated(cursor) {
 		for {

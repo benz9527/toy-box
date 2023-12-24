@@ -71,7 +71,7 @@ func (sub *xSinglePipelineSubscriber[T]) IsStopped() bool {
 }
 
 func (sub *xSinglePipelineSubscriber[T]) eventsHandle() {
-	readCursor := sub.seq.GetReadCursor().AtomicLoad()
+	readCursor := sub.seq.GetReadCursor().Load()
 	spin := sub.spin
 	for {
 		if sub.IsStopped() {
