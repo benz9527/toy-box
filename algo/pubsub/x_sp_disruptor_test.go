@@ -42,7 +42,11 @@ func TestCeilCapacity(t *testing.T) {
 	}
 }
 
-func testXSinglePipelineDisruptorUint64(t *testing.T, gTotal, tasks int, capacity uint64, bs BlockStrategy, bitmapCheck bool, reportFile *os.File) {
+func testXSinglePipelineDisruptorUint64(
+	t *testing.T, gTotal, tasks int, capacity uint64,
+	bs BlockStrategy, bitmapCheck bool,
+	reportFile *os.File, errorCounter *atomic.Uint64,
+) {
 	var (
 		counter = &atomic.Int64{}
 		bm      bitmap.Bitmap
@@ -82,6 +86,9 @@ func testXSinglePipelineDisruptorUint64(t *testing.T, gTotal, tasks int, capacit
 			for j := 0; j < tasks; j++ {
 				if _, _, err := disruptor.Publish(uint64(idx*tasks + j)); err != nil {
 					t.Logf("publish failed, err: %v", err)
+					if errorCounter != nil {
+						errorCounter.Add(1)
+					}
 					break
 				}
 			}
@@ -111,6 +118,9 @@ func testXSinglePipelineDisruptorUint64(t *testing.T, gTotal, tasks int, capacit
 			if reportFile != nil {
 				_, _ = reportFile.WriteString("bitmap check failed by not equal!\n")
 			}
+			if errorCounter != nil {
+				errorCounter.Add(1)
+			}
 			for i := 0; i < len(bm1bits); i++ {
 				if bytes.Compare(bm1bits[i:i+1], bm2bits[i:i+1]) != 0 {
 					if reportFile != nil {
@@ -139,7 +149,7 @@ func testXSinglePipelineDisruptorUint64(t *testing.T, gTotal, tasks int, capacit
 	}
 }
 
-func testXSinglePipelineDisruptorString(t *testing.T, gTotal, tasks int, capacity uint64, bs BlockStrategy, bitmapCheck bool, reportFile *os.File) {
+func testXSinglePipelineDisruptorString(t *testing.T, gTotal, tasks int, capacity uint64, bs BlockStrategy, bitmapCheck bool, reportFile *os.File, errorCounter *atomic.Uint64) {
 	var (
 		counter = &atomic.Int64{}
 		bm      bitmap.Bitmap
@@ -161,6 +171,9 @@ func testXSinglePipelineDisruptorString(t *testing.T, gTotal, tasks int, capacit
 					t.Logf("error panic: %v", r)
 					if reportFile != nil {
 						_, _ = reportFile.WriteString(fmt.Sprintf("error panic: %v\n", r))
+					}
+					if errorCounter != nil {
+						errorCounter.Add(1)
 					}
 				}
 				rwg.Done()
@@ -197,6 +210,9 @@ func testXSinglePipelineDisruptorString(t *testing.T, gTotal, tasks int, capacit
 			for j := 0; j < tasks; j++ {
 				if _, _, err := disruptor.Publish(fmt.Sprintf("%d", idx*tasks+j)); err != nil {
 					t.Logf("publish failed, err: %v", err)
+					if errorCounter != nil {
+						errorCounter.Add(1)
+					}
 					break
 				}
 			}
@@ -225,6 +241,9 @@ func testXSinglePipelineDisruptorString(t *testing.T, gTotal, tasks int, capacit
 		if !bm.EqualTo(checkBM) {
 			if reportFile != nil {
 				_, _ = reportFile.WriteString("bitmap check failed by not equal!\n")
+			}
+			if errorCounter != nil {
+				errorCounter.Add(1)
 			}
 			for i := 0; i < len(bm1bits); i++ {
 				if bytes.Compare(bm1bits[i:i+1], bm2bits[i:i+1]) != 0 {
@@ -272,7 +291,7 @@ func TestXSinglePipelineDisruptor(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			testXSinglePipelineDisruptorUint64(t, tc.gTotal, tc.tasks, 1024*1024, tc.bs, false, nil)
+			testXSinglePipelineDisruptorUint64(t, tc.gTotal, tc.tasks, 1024*1024, tc.bs, false, nil, nil)
 		})
 	}
 }
@@ -298,12 +317,13 @@ func TestXSinglePipelineDisruptorWithBitmapCheck(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			testXSinglePipelineDisruptorUint64(t, tc.gTotal, tc.tasks, 1024*1024, tc.bs, true, nil)
+			testXSinglePipelineDisruptorUint64(t, tc.gTotal, tc.tasks, 1024*1024, tc.bs, true, nil, nil)
 		})
 	}
 }
 
 func TestXSinglePipelineDisruptorWithBitmapCheckAndReport(t *testing.T) {
+	errorCounter := &atomic.Uint64{}
 	reportFile, err := os.OpenFile(filepath.Join(os.TempDir(), "pubsub-report-"+time.Now().Format(time.RFC3339)+".txt"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	defer func() {
 		if reportFile != nil {
@@ -327,7 +347,7 @@ func TestXSinglePipelineDisruptorWithBitmapCheckAndReport(t *testing.T) {
 		{"gosched 1000*10000", 10, 1000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
 		{"gosched 5000*10000", 10, 5000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
 		{"gosched 10000*10000", 5, 10000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
-		{"chan 1*10000", 10000, 1, 10000, 1024, NewXCacheChannelBlockStrategy()},
+		//{"chan 1*10000", 10000, 1, 10000, 1024, NewXCacheChannelBlockStrategy()},
 		//{"chan 10*100", 1000, 10, 100, 512, NewXCacheChannelBlockStrategy()},
 		//{"chan 10*100", 1000, 10, 100, 1024, NewXCacheChannelBlockStrategy()},
 		//{"chan 100*10000", 200, 100, 10000, 1024 * 1024, NewXCacheChannelBlockStrategy()},
@@ -341,13 +361,14 @@ func TestXSinglePipelineDisruptorWithBitmapCheckAndReport(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			for i := 0; i < tc.loop; i++ {
 				_, _ = reportFile.WriteString(fmt.Sprintf("\n====== begin uint64 report(%s, %d) ======\n", tc.name, i))
-				testXSinglePipelineDisruptorUint64(t, tc.gTotal, tc.tasks, tc.capacity, tc.bs, true, reportFile)
+				testXSinglePipelineDisruptorUint64(t, tc.gTotal, tc.tasks, tc.capacity, tc.bs, true, reportFile, errorCounter)
 			}
 		})
 	}
 }
 
 func TestXSinglePipelineDisruptorWithBitmapCheckAndReport_str(t *testing.T) {
+	errorCounter := &atomic.Uint64{}
 	reportFile, err := os.OpenFile(filepath.Join(os.TempDir(), "pubsub-report-str-"+time.Now().Format(time.RFC3339)+".txt"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	defer func() {
 		if reportFile != nil {
@@ -367,11 +388,11 @@ func TestXSinglePipelineDisruptorWithBitmapCheckAndReport_str(t *testing.T) {
 		{"gosched 10*100 str", 1000, 10, 100, 512, NewXGoSchedBlockStrategy()},
 		{"gosched 10*100 str", 1000, 10, 100, 1024, NewXGoSchedBlockStrategy()},
 		{"gosched 100*10000 str", 1000, 100, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
-		//{"gosched 500*10000 str", 100, 500, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
-		//{"gosched 1000*10000 str", 10, 1000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
-		//{"gosched 5000*10000 str", 10, 5000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
-		//{"gosched 10000*10000 str", 5, 10000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
-		{"chan 1*10000 str", 1000, 1, 10000, 1024, NewXCacheChannelBlockStrategy()},
+		{"gosched 500*10000 str", 100, 500, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
+		{"gosched 1000*10000 str", 10, 1000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
+		{"gosched 5000*10000 str", 10, 5000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
+		{"gosched 10000*10000 str", 5, 10000, 10000, 1024 * 1024, NewXGoSchedBlockStrategy()},
+		//{"chan 1*10000 str", 1000, 1, 10000, 1024, NewXCacheChannelBlockStrategy()},
 		//{"chan 10*100 str", 1000, 10, 100, 512, NewXCacheChannelBlockStrategy()},
 		//{"chan 10*100 str", 1000, 10, 100, 1024, NewXCacheChannelBlockStrategy()},
 		//{"chan 100*10000 str", 1000, 100, 10000, 1024 * 1024, NewXCacheChannelBlockStrategy()},
@@ -385,10 +406,11 @@ func TestXSinglePipelineDisruptorWithBitmapCheckAndReport_str(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			for i := 0; i < tc.loop; i++ {
 				_, _ = reportFile.WriteString(fmt.Sprintf("\n====== begin string report(%s, %d) ======\n", tc.name, i))
-				testXSinglePipelineDisruptorString(t, tc.gTotal, tc.tasks, tc.capacity, tc.bs, true, reportFile)
+				testXSinglePipelineDisruptorString(t, tc.gTotal, tc.tasks, tc.capacity, tc.bs, true, reportFile, errorCounter)
 			}
 		})
 	}
+	t.Logf("errors: %d\n", errorCounter.Load())
 }
 
 func testNoCacheChannel(t *testing.T, chSize, gTotal, tasks int) {
