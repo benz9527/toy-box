@@ -36,7 +36,7 @@ https://www.intel.com/content/www/us/en/docs/programmable/683888/current/qpi-ove
 ### MESI
 
 M（修改，Modified）：本地处理器已经修改缓存行，即是脏行，它的内容与内存中的内容不一样，并且此 cache 只有本地一个拷贝(专有)；
-E（专有，Exclusive）：缓存行内容和内存中的一样，而且其它处理器都没有这行数据；
+E（独占，Exclusive）：缓存行内容和内存中的一样，而且其它处理器都没有这行数据；
 S（共享，Shared）：缓存行内容和内存中的一样, 有可能其它处理器也存在此缓存行的拷贝；
 I（无效，Invalid）：缓存行失效, 不能使用。
 
@@ -98,6 +98,18 @@ Request For Ownership 是一种缓存一致性协议，用于在多处理器系�
 
 # Memory Barrier
 
+内存乱序访问主要发生在两个阶段：
+
+1. 编译时，编译器优化导致内存乱序访问（指令重排）
+
+2. 运行时，多 CPU 间交互引起内存乱序访问
+
+常用场景：
+- 实现同步原语（synchronization primitives）
+- 实现无锁数据结构（lock-free data structures）
+- 驱动程序（device drivers）
+
+## 指令实现
 x86的lock#指令前缀（prefix）主要解决原子性（atomicity）的问题，同时隐含了内存屏障（memory barrier）。
 
 相当于这条原子指令执行结束后，写到内存地址的内容是对其他核心都可见的。
@@ -106,9 +118,92 @@ x86的lock#指令前缀（prefix）主要解决原子性（atomicity）的问题
 
 https://www.kernel.org/doc/Documentation/memory-barriers.txt
 
+https://lwn.net/Articles/847481/
+
 - smp_wmb()
 - smp_rmb()
 - smp_mb()
+- mb()
+
+参考 linux kernel kfifo 的实现：
+> 索引 in & out，会被两个不同的线程访问，它们共同指明了 ringbuff 中的实际数据边界。
+> 也就是它们本身与 ringbuffer 的数据存在访问上的顺序关系，在没有使用锁的同步机制，
+> 要保证顺序关系的正确性，就需要使用 memory barrier。
+> `unsigned int __kfifo_put(struct kfifo *fifo, const unsigned char *buffer, unsigned int len)`
+> 先通过 in 和 out 来确定可以向 ringbuffer 中写入数据量的多少，这时，out 索引应该先被读取后才能真正的将用户 
+> buffer 中的数据写入缓冲区，因此这里会使用到了 smp_mb()。
+> in 索引在 put 的函数中，需要先在 ringbuffer 中写入数据后才能被修改，需要通过 smp_wmb() 来完成。
+> `unsigned int __kfifo_get(struct kfifo *fifo, unsigned char *buffer, unsigned int len)`
+> 同样地，读使用 smp_mb() 来确保修改 out 索引之前 ringbuffer 中数据已经被成功读取并写入用户 buffer 中了。
+> 通过 smp_rmb() 保证先读取 in 的索引（确定要读取多少数据）再去读取 ringbuffer 的数据。
+
+```c
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/slab.h>
+#include <linux/err.h>
+#include <linux/kfifo.h>
+#include <linux/log2.h>
+
+unsigned int __kfifo_put(struct kfifo *fifo, 
+                         const unsigned char *buffer,
+                         unsigned int len)
+{
+    usigned int l;
+    len = min(len, fifo->size - fifo->in + fifo->out);
+    smp_mb();
+    l = min(len, fifo->size - (fifo->in & (fifo->size-1)));
+    memcpy(fifo->buffer+(fifo->in & (fifo->size-1)), buffer, l);
+    memcpy(fifo->buffer, buffer+l, len-l);
+    smp_wmb();
+    fifo->in += len;
+    return len;
+}
+EXPORT_SYMBOL(__kfifo_put);
+
+unsigned int __kfifo_get(struct kfifo *fifo,
+                         unsigned char *buffer,
+                         unsigned int len)
+{
+    unsigned int l;
+    len = min(len, fifo->in - fifo->out);
+    smp_rmb();
+    l = min(len, fifo->size - (fifo->out & (fifo->size-1)));
+    memcpy(buffer, fifo->buffer+(fifo->out & (fifo->size-1)), l);
+    memcpy(buffer+l, fifo->buffer, len-l);
+    smp_mb();
+    fifo->out += len;
+    return len;
+}
+EXPORT_SYMBOL(__kfifo_get);
+```
+
+### x86 UP
+```c
+// smp_wmb(), smp_rmb(), smp_mb() and mb()
+#define barrier() __asm__ __volatile__("": : :"memory")
+```
+
+### x86 SMP
+```c
+// smp_wmb(), smp_rmb(), smp_mb() and mb() CONFIG_X86_32
+#define mb() alternative("lock; addl $0,0(%%esp)", "mfence", X86_FEATURE_XMM2)
+#define rmb() alternative("lock; addl $0,0(%%esp)", "lfence", X86_FEATURE_XMM2)
+#define wmb() alternative("lock; addl $0,0(%%esp)", "sfence", X86_FEATURE_XMM)
+// x64
+#define mb() asm volatile("mfence":::"memory")
+#define rmb() asm volatile("lfence":::"memory")
+#define wmb() asm volatile("sfence" ::: "memory")
+```
+asm volatile 严禁在此处汇编语句与其它语句重组优化，memory强制编译器假设RAM所有内存单元均被汇编指令修改，"sfence" ::: 表示在此插入一条串行化汇编指令sfence。
+- mfence：串行化发生在mfence指令之前的读写操作
+- lfence：串行化发生在mfence指令之前的读操作、但不影响写操作
+- sfence：串行化发生在mfence指令之前的写操作、但不影响读操作
+
+由于x86的32位CPU有可能不提供mfence、lfence、sfence三条汇编指令的支持，故在不支持mfence的指令中使用："lock; addl $0,0(%%esp)", "mfence"。lock表示将“addl $0,0(%%esp)”语句作为内存屏障。
+
+关于lock的实现：cpu上有一根pin #HLOCK连到北桥，lock前缀会在执行这条指令前先去拉这根pin，持续到这个指令结束时放开#HLOCK pin，在这期间，北桥会屏蔽掉一切外设以及AGP的内存操作。
+也就保证了这条指令的atomic。
 
 # RingBuffer
 
