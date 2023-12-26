@@ -1,5 +1,9 @@
 package bit
 
+import (
+	"unsafe"
+)
+
 func RoundupPowOf2(target uint64) uint64 {
 	target--
 	target |= target >> 1
@@ -68,39 +72,58 @@ func IsPowOf2(target uint64) bool {
 	return target&(target-1) == 0
 }
 
-type OneBits interface {
+type Number interface {
 	~uint8 | ~uint16 | ~uint32 | ~uint64 | ~int8 | ~int16 | ~int32 | ~int64 | ~int
 }
 
 // HammingWeight counts the number of 1 bit in a number.
-type HammingWeight[T OneBits] func(n T) int64
+type HammingWeight[T Number] func(n T) uint8
+type BitCount[T Number] HammingWeight[T]
+
+func convert[T Number](n T) uint64 {
+	var target uint64
+	switch unsafe.Sizeof(n) {
+	case 1:
+		target = uint64(*(*uint8)(unsafe.Pointer(&n)))
+	case 2:
+		target = uint64(*(*uint16)(unsafe.Pointer(&n)))
+	case 4:
+		target = uint64(*(*uint32)(unsafe.Pointer(&n)))
+	case 8:
+		target = *(*uint64)(unsafe.Pointer(&n))
+	}
+	return target
+}
+
+// variable-precision SWAR algorithm
 
 // HammingWeightBySWAR counts the number of 1 bit by group statistics.
-func HammingWeightBySWAR[T OneBits](n T) int64 {
-	_n := int64(n)
-	// 使用树状的方式进行计算
-	// 0x55555555 = 01010101010101010101010101010101
-	// 保留原数字的奇数位的 1 + 保留原数字的偶数位的 1
-	// 每两个二进制位表示原数字对应的二进制位的1的数量
+// Calculate the number of 1 bit by tree-like structure.
+// Example:
+// 0x55555555 = 01010101010101010101010101010101
+// It will keep the odd bits of the original number 1 and keep the even bits of the original number 1.
+// Every 2 binary bits represent the number of 1 in the corresponding binary bit of the original number.
+// 0x33333333 = 00110011001100110011001100110011
+// It will keep the right two bits of the sum of the previous step and keep the left two bits of the sum of the previous step.
+// Every 4 binary bits represent the number of 1 in the corresponding binary bit of the original number.
+// 0x0f0f0f0f = 00001111000011110000111100001111
+// It will keep the right four bits of the sum of the previous step and keep the left four bits of the sum of the previous step.
+// Every 8 binary bits represent the number of 1 in the corresponding binary bit of the original number.
+// 0x00ff00ff = 00000000111111110000000011111111
+// It will keep the right eight bits of the sum of the previous step and keep the left eight bits of the sum of the previous step.
+// Every 16 binary bits represent the number of 1 in the corresponding binary bit of the original number.
+// 0x0000ffff = 00000000000000001111111111111111
+// It will keep the right sixteen bits of the sum of the previous step and keep the left sixteen bits of the sum of the previous step.
+// Every 32 binary bits represent the number of 1 in the corresponding binary bit of the original number.
+func HammingWeightBySWAR[T Number](n T) uint8 {
+	_n := convert[T](n)
 	_n = (_n & 0x5555555555555555) + ((_n >> 1) & 0x5555555555555555)
-	// 0x33333333 = 00110011001100110011001100110011
-	// 保留上一步求出的和的右边两个位 + 保留上一步求出的和的左边两个位
-	// 每四个二进制位表示原数字对应二进制位的 1 的数量
 	_n = (_n & 0x3333333333333333) + ((_n >> 2) & 0x3333333333333333)
-	// 0x0f0f0f0f = 00001111000011110000111100001111
-	// 保留上一步求出的右边四个位 + 保留上一步求出的和的左边四个位
-	// 每八个二进制位表示原数字对应二进制位的1的数量
 	_n = (_n & 0x0f0f0f0f0f0f0f0f) + ((_n >> 4) & 0x0f0f0f0f0f0f0f0f)
-	// 0x00ff00ff = 00000000111111110000000011111111
-	// 保留上一步求出的右边八个位 + 保留上一步求出的和的左边八个位
-	// 每十六个二进制位表示原数字对应二进制位的1的数量
 	_n = (_n & 0x00ff00ff00ff00ff) + ((_n >> 8) & 0x00ff00ff00ff00ff)
-	// 0x0000ffff = 00000000000000001111111111111111
-	// 保留上一步求出的右边十六个位 + 保留上一步求出的和的左边十六个位
-	// 每三十二个二进制位表示原数字对应二进制位的1的数量
 	_n = (_n & 0x0000ffff0000ffff) + ((_n >> 16) & 0x0000ffff0000ffff)
 	_n = (_n & 0x00000000ffffffff) + ((_n >> 32) & 0x00000000ffffffff)
-	return _n
+	return uint8(_n)
 }
 
 // HammingWeightBySWAR2 counts the number of 1 bit by group statistics.
@@ -122,40 +145,32 @@ func HammingWeightBySWAR[T OneBits](n T) int64 {
 // 0x3 * 0x01010101 = 0x03030303
 // 0x03030303 & 0x3fffffff = 0x03030303
 // 0x03030303 >> 24 = 0x3
-func HammingWeightBySWAR2[T OneBits](n T) int64 {
-	_n := int64(n)
-	// 以 32 位为例
-	// 0x55555555 = 01010101010101010101010101010101
-	// 保留原数字的奇数位的 1 + 保留原数字的偶数位的 1
-	// 每两个二进制位表示原数字对应的二进制位的1的数量
+func HammingWeightBySWAR2[T Number](n T) uint8 {
+	_n := convert[T](n)
 	_n = (_n & 0x5555555555555555) + ((_n >> 1) & 0x5555555555555555)
-	// 0x33333333 = 00110011001100110011001100110011
-	// 保留上一步求出的和的右边两个位 + 保留上一步求出的和的左边两个位
-	// 每四个二进制位表示原数字对应二进制位的 1 的数量
 	_n = (_n & 0x3333333333333333) + ((_n >> 2) & 0x3333333333333333)
-	// 0x0f0f0f0f = 00001111000011110000111100001111
-	// 保留上一步求出的右边四个位 + 保留上一步求出的和的左边四个位
-	// 每八个二进制位表示原数字对应二进制位的1的数量
 	_n = (_n & 0x0f0f0f0f0f0f0f0f) + ((_n >> 4) & 0x0f0f0f0f0f0f0f0f)
-	// 32 bit reach here will be overed by ((_n * 0x01010101) & ((1 << 32) - 1)) >> 24
-	_n = (_n & 0x00ff00ff00ff00ff) + ((_n >> 8) & 0x00ff00ff00ff00ff)
-	_n = (_n & 0x0000ffff0000ffff) + ((_n >> 16) & 0x0000ffff0000ffff)
-	_n = (_n & 0x00000000ffffffff) + ((_n >> 32) & 0x00000000ffffffff)
+	// 8 bits quick multiply
+	// 0x01010101 = 00000001 00000001 00000001 00000001
+	//            = 1 << 24 | 1 << 16 | 1 << 8 | 1 << 0
+	// i * 0x01010101 = i << 24 + i << 16 + i << 8 + i << 0
+	// Merge
+	// (i * 0x01010101)>>24 = (i<<24)>>24 + (i<<16)>>24 + (i<<8)>>24 + (i<<0)>>24
 	// Hamming Weight
-	_n = ((_n * 0x01010101001010101) & ((1 << 32) - 1)) >> 24
-	return _n
+	_n = ((_n * 0x0101010101010101) & ((1 << 64) - 1)) >> 56
+	return uint8(_n)
 }
 
 // HammingWeightBySWAR3 counts the number of 1 bit by group statistics.
-func HammingWeightBySWAR3[T OneBits](n T) int64 {
-	_n := int64(n)
-	bits := func(num int64) int64 {
+func HammingWeightBySWAR3[T Number](n T) uint8 {
+	_n := convert[T](n)
+	bits := func(num uint8) uint8 {
 		remainder := num&0x5 + (num>>1)&0x5
 		return remainder&0x3 + (remainder>>2)&0x3
 	}
-	res := int64(0)
+	res := uint8(0)
 	for i := 0; i < 16; i++ {
-		res += bits((_n >> (i * 4)) & 0xf)
+		res += bits(uint8((_n >> (i * 4)) & 0xf))
 	}
 	return res
 }
@@ -166,11 +181,11 @@ var (
 	}
 )
 
-func HammingWeightByGroupCount[T OneBits](n T) int64 {
-	res := int64(0)
-	_n := int64(n)
+func HammingWeightByGroupCount[T Number](n T) uint8 {
+	_n := convert[T](n)
+	res := uint8(0)
 	for i := 0; i < 16; i++ {
-		res += int64(bitCount[(_n>>(i*4))&0xf])
+		res += bitCount[uint8((_n>>(i*4))&0xf)]
 	}
 	return res
 }
