@@ -12,6 +12,16 @@ func RoundupPowOf2(target uint64) uint64 {
 	return target
 }
 
+// RoundupPowOf2ByLoop rounds up the target to the power of 2.
+// Plain thinking.
+func RoundupPowOf2ByLoop(target uint64) uint64 {
+	var result uint64 = 1
+	for result < target {
+		result <<= 1
+	}
+	return result
+}
+
 // RoundupPowOf2ByCeil rounds up the target to the power of 2.
 // Copy from linux kernel kfifo.
 func RoundupPowOf2ByCeil(target uint64) uint64 {
