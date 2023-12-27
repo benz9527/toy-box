@@ -9,7 +9,6 @@ type RingBuffer[T any] interface {
 	Capacity() uint64
 	LoadElement(cursor uint64) (RingBufferElement[T], bool)
 	StoreElement(cursor uint64, value T)
-	Free()
 }
 
 type RingBufferCursor interface {

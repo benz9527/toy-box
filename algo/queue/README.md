@@ -98,16 +98,35 @@ Request For Ownership 是一种缓存一致性协议，用于在多处理器系�
 
 # Memory Barrier
 
-内存乱序访问主要发生在两个阶段：
+这里需要先介绍一下 CPU 的乱序执行（out-of-order execution）。
 
-1. 编译时，编译器优化导致内存乱序访问（指令重排）
+它主要是为了提高 CPU 的执行效率，CPU 会在不改变程序执行结果的前提下，对指令进行重排序。
 
-2. 运行时，多 CPU 间交互引起内存乱序访问
+这种排序主要是内存排序，是 CPU 访问主存的顺序，而不是代码的顺序。
+
+它在编译器编译时发生或者是在 CPU 运行时发生。
+
+为了避免乱序执行带来一些问题，需要内存屏障（memory barrier）来确保多线程的同步。
+
+乱序访问主要发生在两个阶段：
+
+1. 编译时，编译器优化导致内存乱序访问（指令重排）。这种时候使用编译时内存屏障。
+
+2. 运行时，多 CPU（Symmetric multiprocessor，SMP）间交互引起内存乱序访问。这种时候使用运行时内存屏障（硬件内存屏障）。
+    - happens-before: 按照程序的代码顺序执行。
+    - synchronized-with: 两个线程之间的同步，对于同一个原子操作，需要同步关系，store 一定要先于 load
+
+SMP 系统：
+- 在 SMP 中，同一个线程的原子操作还是会按照代码顺序执行，但是不同线程之间的执行是任意的（顺序一致，Sequential Consistency）
+- 如果某个操作只要求是原子操作，除此之外不需要其他同步保障，就能使用松弛一致（Relaxed Consistency）来允许某种类型的重排序
+- 读写任意排序，需要受制于显式的内存屏障（memory barrier）来保证一致性（Weak Consistency）
 
 常用场景：
 - 实现同步原语（synchronization primitives）
 - 实现无锁数据结构（lock-free data structures）
 - 驱动程序（device drivers）
+
+https://gfw.go101.org/article/memory-model.html#mutex
 
 ## 指令实现
 x86的lock#指令前缀（prefix）主要解决原子性（atomicity）的问题，同时隐含了内存屏障（memory barrier）。

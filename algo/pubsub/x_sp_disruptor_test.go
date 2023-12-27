@@ -3,6 +3,7 @@ package pubsub
 import (
 	"bytes"
 	"fmt"
+	"github.com/benz9527/toy-box/algo/bit"
 	"github.com/benz9527/toy-box/algo/bitmap"
 	"github.com/stretchr/testify/assert"
 	"log/slog"
@@ -37,7 +38,7 @@ func TestCeilCapacity(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(fmt.Sprintf("capacity: %d, ceil: %d", tc.capacity, tc.ceil), func(t *testing.T) {
-			assert.Equal(t, tc.ceil, ceilCapacity(tc.capacity))
+			assert.Equal(t, tc.ceil, bit.RoundupPowOf2ByCeil(tc.capacity))
 		})
 	}
 }

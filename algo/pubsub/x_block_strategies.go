@@ -129,6 +129,8 @@ func (bs *xCacheChannelBlockStrategy) Done() {
 	}
 }
 
+// https://gfw.go101.org/article/concurrent-synchronization-more.html
+
 type xCondBlockStrategy struct {
 	cond *sync.Cond
 }

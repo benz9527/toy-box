@@ -4,6 +4,7 @@ package pubsub
 
 import (
 	"fmt"
+	"github.com/benz9527/toy-box/algo/bit"
 	"github.com/benz9527/toy-box/algo/queue"
 	"sync/atomic"
 	"time"
@@ -25,7 +26,6 @@ type xSinglePipelineDisruptor[T any] struct {
 		Subscriber[T]
 		stopper
 	}
-	rbuf   queue.RingBuffer[T]
 	status disruptorStatus
 }
 
@@ -34,7 +34,7 @@ func NewXSinglePipelineDisruptor[T any](
 	strategy BlockStrategy,
 	handler EventHandler[T],
 ) Disruptor[T] {
-	capacity = ceilCapacity(capacity)
+	capacity = bit.RoundupPowOf2ByCeil(capacity)
 	seq := NewXSequencer(capacity)
 	// Can't start from 0, because 0 will be treated as nil value
 	seq.GetWriteCursor().Increase()
@@ -45,7 +45,6 @@ func NewXSinglePipelineDisruptor[T any](
 	d := &xSinglePipelineDisruptor[T]{
 		pub:    pub,
 		sub:    sub,
-		rbuf:   rb,
 		status: disruptorReady,
 	}
 	return d
@@ -76,7 +75,6 @@ func (dis *xSinglePipelineDisruptor[T]) Stop() error {
 			atomic.CompareAndSwapInt32((*int32)(&dis.status), int32(disruptorRunning), int32(disruptorReady))
 			return err
 		}
-		//dis.rbuf.Free()
 		return nil
 	}
 	return fmt.Errorf("disruptor already stopped")
@@ -98,15 +96,4 @@ func (dis *xSinglePipelineDisruptor[T]) RegisterSubscriber(sub Subscriber[T]) er
 	// Single pipeline disruptor only support one subscriber to consume the events.
 	// It will be registered at the construction.
 	return nil
-}
-
-func ceilCapacity(capacity uint64) uint64 {
-	if capacity < 2 {
-		return 2
-	}
-	var _cap uint64 = 1
-	for _cap < capacity {
-		_cap <<= 1
-	}
-	return _cap
 }
