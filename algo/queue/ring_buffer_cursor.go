@@ -17,12 +17,12 @@ import (
 //    the frequency if higher than 80ms per event.
 
 var (
-	_ RingBufferCursor = (*xRingBufferCursor)(nil)
+	_ RingBufferCursor = (*rbCursor)(nil)
 )
 
 const CacheLinePadSize = unsafe.Sizeof(cpu.CacheLinePad{})
 
-// xRingBufferCursor is a cursor for xRingBuffer.
+// rbCursor is a cursor for xRingBuffer.
 // Only increase, if it overflows, it will be reset to 0.
 // Occupy a whole cache line (flag+tag+data) and a cache line data is 64 bytes.
 // L1D cache: cat /sys/devices/system/cpu/cpu0/cache/index0/coherency_line_size
@@ -32,7 +32,7 @@ const CacheLinePadSize = unsafe.Sizeof(cpu.CacheLinePad{})
 // MESI (Modified-Exclusive-Shared-Invalid)
 // RAM data -> L3 cache -> L2 cache -> L1 cache -> CPU register
 // CPU register (cache hit) -> L1 cache -> L2 cache -> L3 cache -> RAM data
-type xRingBufferCursor struct {
+type rbCursor struct {
 	// sequence consistency data race free program
 	// avoid load into cpu cache will be broken by others data
 	// to compose a data race cache line
@@ -42,23 +42,27 @@ type xRingBufferCursor struct {
 }
 
 func NewXRingBufferCursor() RingBufferCursor {
-	return &xRingBufferCursor{}
+	return &rbCursor{}
 }
 
-func (x *xRingBufferCursor) Increase() uint64 {
+func (c *rbCursor) Next() uint64 {
 	// Golang atomic store with LOCK prefix, it means that
 	// it implements the Happens-Before relationship.
 	// But it is not clearly that atomic add satisfies the
 	// Happens-Before relationship.
 	// https://go.dev/ref/mem
-	return atomic.AddUint64(&x.cursor, 1)
+	return atomic.AddUint64(&c.cursor, 1)
 }
 
-func (x *xRingBufferCursor) Load() uint64 {
+func (c *rbCursor) NextN(n uint64) uint64 {
+	return atomic.AddUint64(&c.cursor, n)
+}
+
+func (c *rbCursor) Load() uint64 {
 	// Golang atomic load does not promise the Happens-Before
-	return atomic.LoadUint64(&x.cursor)
+	return atomic.LoadUint64(&c.cursor)
 }
 
-func (x *xRingBufferCursor) CAS(old, new uint64) bool {
-	return atomic.CompareAndSwapUint64(&x.cursor, old, new)
+func (c *rbCursor) CAS(old, new uint64) bool {
+	return atomic.CompareAndSwapUint64(&c.cursor, old, new)
 }

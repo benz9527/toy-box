@@ -12,7 +12,7 @@ func TestXRingBufferCursor(t *testing.T) {
 	cursor := NewXRingBufferCursor()
 	beginIs := time.Now()
 	for i := 0; i < 100000000; i++ {
-		x := cursor.Increase()
+		x := cursor.Next()
 		if x%10000000 == 0 {
 			t.Logf("x=%d", x)
 		}
@@ -24,14 +24,14 @@ func TestXRingBufferCursor(t *testing.T) {
 func TestXRingBufferCursorConcurrency(t *testing.T) {
 	// lower than single goroutine test
 	cursor := NewXRingBufferCursor()
-	t.Logf("cursor size=%v", unsafe.Sizeof(*cursor.(*xRingBufferCursor)))
+	t.Logf("cursor size=%v", unsafe.Sizeof(*cursor.(*rbCursor)))
 	beginIs := time.Now()
 	wg := sync.WaitGroup{}
 	wg.Add(10000)
 	for i := 0; i < 10000; i++ {
 		go func(idx int) {
 			for j := 0; j < 10000; j++ {
-				x := cursor.Increase()
+				x := cursor.Next()
 				if x%10000000 == 0 {
 					t.Logf("gid=%d, x=%d", idx, x)
 				}

@@ -63,11 +63,11 @@ func (pub *xSinglePipelinePublisher[T]) Publish(event T) (uint64, bool, error) {
 	if pub.IsStopped() {
 		return 0, false, fmt.Errorf("publisher closed")
 	}
-	nextWriteCursor := pub.seq.GetWriteCursor().Increase()
+	nextWriteCursor := pub.seq.GetWriteCursor().Next()
 	for {
 		readCursor := pub.seq.GetReadCursor().Load()
 		if nextWriteCursor-readCursor <= pub.capacity {
-			pub.rb.StoreElement(nextWriteCursor-1, event)
+			pub.rb.StoreEntry(nextWriteCursor-1, event)
 			pub.strategy.Done()
 			return nextWriteCursor - 1, true, nil
 		} else {
@@ -86,7 +86,7 @@ func (pub *xSinglePipelinePublisher[T]) PublishTimeout(event T, timeout time.Dur
 			slog.Warn("publisher closed", "event", event)
 			return
 		}
-		nextCursor := pub.seq.GetWriteCursor().Increase()
+		nextCursor := pub.seq.GetWriteCursor().Next()
 		var ok bool
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
@@ -125,7 +125,7 @@ func (pub *xSinglePipelinePublisher[T]) publishAt(event T, cursor uint64) bool {
 	if cursor > readCursor+pub.seq.Capacity() {
 		return false
 	}
-	pub.rb.StoreElement(cursor, event)
+	pub.rb.StoreEntry(cursor, event)
 	pub.strategy.Done()
 	return true
 }

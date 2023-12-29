@@ -1,6 +1,4 @@
-# Disruptor
-
-## chan
+# chan
 
 当竞争非常大而且是大量的元素需要通过 chan 传递时，对于 chan 而言其整体大部分时间是出于系统调用上，性能会下降非常明显。
 
@@ -20,14 +18,29 @@ chan 使用的互斥锁是 `runtime.mutex`，在 linux 系统中它的实现是 
 
 ![futex](./assets/futex.jpg)
 
+# ringbuffer
 
-## Unit test
+我希望能够实现（复刻）一个基于 ringbuffer 的 pubsub 库，来满足我本人的一些构思和尝试。
+
+## Java Disruptor
+
+
+
+# Unit test
 `go test` 的构建的程序是没有进行 inline 的，所以使用接口的形式来实现的话，会有一定的性能损耗。
 
-但是转向使用 `go run` 使用的 inline 的程序，就会发现性能提升了很多。
+但是转向使用 `go run` 使用的 inline 的程序，就会发现性能提升了很多，因为是直接并发地写入和读取，导致这里的竞争是激烈的。
 
-经过测试，会比非接口形式的实现还略快一点。
+经过测试，会比非接口形式的实现还略快一点，但是会存在小部分时间下的性能下降问题，这块需要抛弃这块的实现，保留 ringbuffer 和 cursor false sharing 的基础。
 
-## Reference
+重构整体的生产、消费和阻塞等待实现。
 
-github.com/bruceshao/lockfree
+# Reference
+
+https://github.com/bruceshao/lockfree
+
+上面这个库基于 CAS 实现了一些 lockfree 的数据结构，复刻这里面的操作会发现不时会有一些 CAS 操作过长的情况， 我这里的基于上面的实现性能不够稳定。
+
+https://github.com/LMAX-Exchange/disruptor
+
+还得是 Java 的这个实现稳妥。
