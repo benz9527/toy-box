@@ -82,7 +82,8 @@ func (sub *xSinglePipelineSubscriber[T]) eventsHandle() {
 			if sub.IsStopped() {
 				return
 			}
-			if e, exists := sub.rb.LoadEntry(readCursor); exists {
+			e := sub.rb.LoadEntryByCursor(readCursor)
+			if e.GetCursor() == readCursor {
 				_ = sub.HandleEvent(e.GetValue())
 				spinCount = 0
 				// FIXME handle error
@@ -95,6 +96,7 @@ func (sub *xSinglePipelineSubscriber[T]) eventsHandle() {
 					runtime.Gosched()
 				} else {
 					sub.strategy.WaitFor(func() bool {
+						e := sub.rb.LoadEntryByCursor(readCursor)
 						return e.GetCursor() == readCursor
 					})
 					spinCount = 0

@@ -29,3 +29,6 @@ func (x *xSequencer) Capacity() uint64 {
 func (x *xSequencer) GetWriteCursor() queue.RingBufferCursor {
 	return x.writeCursor
 }
+
+type xSequenceReconciler struct {
+}

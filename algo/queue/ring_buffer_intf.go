@@ -8,8 +8,7 @@ type RingBufferEntry[T any] interface {
 
 type RingBuffer[T any] interface {
 	Capacity() uint64
-	LoadEntry(cursor uint64) (RingBufferEntry[T], bool)
-	StoreEntry(cursor uint64, value T)
+	LoadEntryByCursor(cursor uint64) RingBufferEntry[T]
 }
 
 type RingBufferCursor interface {

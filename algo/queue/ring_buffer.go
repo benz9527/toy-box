@@ -42,7 +42,6 @@ func (e *rbEntry[T]) Store(cursor uint64, value T) {
 type xRingBuffer[T any] struct {
 	capacityMask uint64
 	buffer       []RingBufferEntry[T]
-	valueGuard   T
 }
 
 const _100M = 100 * 1024 * 1024
@@ -61,7 +60,6 @@ func NewXRingBuffer[T any](capacity uint64) RingBuffer[T] {
 	rb := &xRingBuffer[T]{
 		capacityMask: capacity - 1,
 		buffer:       make([]RingBufferEntry[T], capacity),
-		valueGuard:   *new(T),
 	}
 	for i := uint64(0); i < capacity; i++ {
 		rb.buffer[i] = &rbEntry[T]{}
@@ -76,18 +74,6 @@ func (rb *xRingBuffer[T]) Capacity() uint64 {
 	return rb.capacityMask + 1
 }
 
-func (rb *xRingBuffer[T]) StoreEntry(cursor uint64, value T) {
-	e := rb.buffer[cursor&rb.capacityMask]
-	e.Store(cursor, value)
-}
-
-func (rb *xRingBuffer[T]) LoadEntry(cursor uint64) (RingBufferEntry[T], bool) {
-	e := rb.buffer[cursor&rb.capacityMask]
-	if e.GetCursor() == cursor {
-		return e, true
-	}
-	return &rbEntry[T]{
-		cursor: 0,
-		value:  rb.valueGuard,
-	}, false
+func (rb *xRingBuffer[T]) LoadEntryByCursor(cursor uint64) RingBufferEntry[T] {
+	return rb.buffer[cursor&rb.capacityMask]
 }
