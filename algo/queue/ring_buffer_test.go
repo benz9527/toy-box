@@ -7,18 +7,15 @@ import (
 
 func TestXRingBuffer_uint64(t *testing.T) {
 	rb := NewXRingBuffer[uint64](1024)
-	rb.StoreEntry(0, 1)
-	e, ok := rb.LoadEntry(0)
-	assert.True(t, ok)
+	e := rb.LoadEntryByCursor(0)
+	e.Store(0, 1)
 	assert.Equal(t, uint64(1), e.GetValue())
 
-	rb.StoreEntry(1023, 100)
-	e, ok = rb.LoadEntry(1023)
-	assert.True(t, ok)
+	e = rb.LoadEntryByCursor(1023)
+	e.Store(1023, 100)
 	assert.Equal(t, uint64(100), e.GetValue())
 
-	rb.StoreEntry(1024, 1000)
-	e, ok = rb.LoadEntry(1024)
-	assert.True(t, ok)
+	e = rb.LoadEntryByCursor(1024)
+	e.Store(1024, 1000)
 	assert.Equal(t, uint64(1000), e.GetValue())
 }
